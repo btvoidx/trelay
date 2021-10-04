@@ -4,7 +4,7 @@ import "time"
 
 // Holds two connections and allows to close both of them
 type Session interface {
-	Id() int64
+	Id() int
 	ClientConn() Conn
 	SetClientConn(conn Conn)
 	ServerConn() Conn
@@ -14,18 +14,18 @@ type Session interface {
 }
 
 type session struct {
-	id int64
+	id int
 	cc Conn
 	sc Conn
 }
 
 func NewSession() Session {
 	return &session{
-		id: time.Now().UnixNano(),
+		id: time.Now().Nanosecond(),
 	}
 }
 
-func (s *session) Id() int64 { return s.id }
+func (s *session) Id() int { return s.id }
 
 func (s *session) ClientConn() Conn        { return s.cc }
 func (s *session) SetClientConn(conn Conn) { s.cc = conn }
