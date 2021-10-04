@@ -111,7 +111,7 @@ func (s *server) handleSession(session Session) {
 
 			sc := session.ServerConn()
 			if !handled && sc != nil && !sc.Closed() {
-				sc.Write(p)
+				sc.Write(p) //nolint:errcheck
 			}
 		}
 	}()
@@ -140,7 +140,7 @@ func (s *server) handleSession(session Session) {
 
 			cc := session.ClientConn()
 			if !handled && cc != nil && !cc.Closed() {
-				cc.Write(p)
+				cc.Write(p) //nolint:errcheck
 			}
 		}
 	}()
