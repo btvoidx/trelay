@@ -59,6 +59,12 @@ func (s *server) Start() (err error) {
 				"remote":  nc.RemoteAddr().String(),
 			}).Info("Session opened")
 
+			//todo OnSessionOpen
+
+			if session.Closed() {
+				continue
+			}
+
 			s.handleSession(session)
 		}
 	}()
@@ -86,10 +92,6 @@ func (s *server) handleSession(session Session) {
 	go func() {
 		for {
 			if session.Closed() {
-				s.log.WithFields(log.Fields{
-					"session": session.Id(),
-					"remote":  session.ClientConn().RemoteAddr(),
-				}).Info("Session closed")
 				break
 			}
 
@@ -114,6 +116,13 @@ func (s *server) handleSession(session Session) {
 				sc.Write(p) //nolint:errcheck
 			}
 		}
+
+		//todo OnSessionClose
+
+		s.log.WithFields(log.Fields{
+			"session": session.Id(),
+			"remote":  session.ClientConn().RemoteAddr(),
+		}).Info("Session closed")
 	}()
 
 	go func() {
