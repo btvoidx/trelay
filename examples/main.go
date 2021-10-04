@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 
@@ -10,15 +9,14 @@ import (
 )
 
 func main() {
+	log := log.New().WithField("Custom Field", true)
+
 	server := trelay.NewServer("0.0.0.0:7777", "terraria.tk:7777")
-	server.SetLogger(
-		log.New().WithField("Custom Field", true),
-	)
+	server.SetLogger(log)
 
 	err := server.Start()
 	if err != nil {
-		fmt.Println("An error occured when starting the server: ", err.Error())
-		os.Exit(1)
+		log.Fatal("An error occured when starting the server: ", err.Error())
 	}
 
 	defer server.Stop()
