@@ -3,43 +3,51 @@ package trelay
 import (
 	"errors"
 	"net"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
 type Server interface {
+	Id() int
 	Start() error
 	Stop() error
 	Addr() string
 	RemoteAddr() string
 	SetLogger(log log.FieldLogger) Server
+	LoadPlugin(p Plugin) Server
+	LoadPlugins(p []Plugin) Server
 }
 
 type server struct {
-	l     net.Listener
-	log   log.FieldLogger
-	addr  string
-	raddr string
+	id      int
+	l       net.Listener
+	log     log.FieldLogger
+	running bool
+	plugins []Plugin
+	addr    string
+	raddr   string
 }
 
 func NewServer(address string, remoteadress string) Server {
 	return &server{
-		log:   log.StandardLogger(),
-		addr:  address,
-		raddr: remoteadress,
+		id:      time.Now().Nanosecond(),
+		log:     log.StandardLogger(),
+		addr:    address,
+		raddr:   remoteadress,
+		plugins: make([]Plugin, 0),
 	}
 }
 
-func (s *server) SetLogger(log log.FieldLogger) Server {
-	s.log = log
-	return s
-}
+func (s *server) Id() int { return s.id }
 
 func (s *server) Start() (err error) {
 	s.l, err = net.Listen("tcp4", s.addr)
 	if err != nil {
 		return err
 	}
+
+	s.running = true
 
 	s.log.Infof("Server started on %s", s.addr)
 	s.log.Infof("Proxying to %s", s.raddr)
@@ -55,11 +63,12 @@ func (s *server) Start() (err error) {
 			session.SetClientConn(NewConn(nc))
 
 			s.log.WithFields(log.Fields{
-				"session": session.Id(),
-				"remote":  nc.RemoteAddr().String(),
-			}).Info("Session opened")
+				"SessionId": session.Id(),
+			}).Infof("Session with %s was opened", session.ClientConn().RemoteAddr())
 
-			//todo OnSessionOpen
+			for _, plugin := range s.plugins {
+				plugin.OnSessionOpen(session)
+			}
 
 			if session.Closed() {
 				continue
@@ -74,11 +83,50 @@ func (s *server) Start() (err error) {
 
 func (s *server) Stop() (err error) {
 	s.log.Infof("Server stopped")
+
+	for _, plugin := range s.plugins {
+		plugin.OnServerStop(s)
+	}
+
+	s.running = false
 	return s.l.Close()
 }
 
 func (s *server) Addr() string       { return s.addr }
 func (s *server) RemoteAddr() string { return s.raddr }
+
+func (s *server) SetLogger(log log.FieldLogger) Server {
+	s.log = log
+	return s
+}
+
+// Load plugin into a server.
+// Multiple servers can use on instance of a plugin.
+// To forcefully prevent this plugin's OnLoad method should return a unique copy of the plugin.
+// This method is not goroutine-safe.
+func (s *server) LoadPlugin(p Plugin) Server {
+	if s.running {
+		s.log.Errorf("Failed to load plugin %s: server is running", p.Name())
+		return s
+	}
+
+	p.OnServerStart(s)
+	s.plugins = append(s.plugins, p)
+	s.log.Infof("Loaded plugin %s", p.Name())
+
+	return s
+}
+
+// Load multiple plugins into a server.
+// Multiple servers can use on instance of a plugin.
+// To forcefully prevent this plugin's OnLoad method should return a unique copy of the plugin.
+// This method is not goroutine-safe.
+func (s *server) LoadPlugins(p []Plugin) Server {
+	for _, plugin := range p {
+		s.LoadPlugin(plugin)
+	}
+	return s
+}
 
 func (s *server) handleSession(session Session) {
 	sc, err := net.Dial("tcp4", s.raddr)
@@ -108,8 +156,15 @@ func (s *server) handleSession(session Session) {
 				continue
 			}
 
-			//todo middleware here
 			handled := false
+			for _, plugin := range s.plugins {
+				p.ResetHead()
+				handled := plugin.OnClientPacket(p.Id(), p, session)
+
+				if handled {
+					break
+				}
+			}
 
 			sc := session.ServerConn()
 			if !handled && sc != nil && !sc.Closed() {
@@ -117,12 +172,13 @@ func (s *server) handleSession(session Session) {
 			}
 		}
 
-		//todo OnSessionClose
+		for _, plugin := range s.plugins {
+			plugin.OnSessionClose(session)
+		}
 
 		s.log.WithFields(log.Fields{
-			"session": session.Id(),
-			"remote":  session.ClientConn().RemoteAddr(),
-		}).Info("Session closed")
+			"SessionId": session.Id(),
+		}).Infof("Session with %s was closed", session.ClientConn().RemoteAddr())
 	}()
 
 	go func() {
@@ -144,8 +200,15 @@ func (s *server) handleSession(session Session) {
 				continue
 			}
 
-			//todo middleware here
 			handled := false
+			for _, plugin := range s.plugins {
+				p.ResetHead()
+				handled := plugin.OnServerPacket(p.Id(), p, session)
+
+				if handled {
+					break
+				}
+			}
 
 			cc := session.ClientConn()
 			if !handled && cc != nil && !cc.Closed() {
