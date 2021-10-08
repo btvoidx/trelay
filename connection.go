@@ -38,13 +38,9 @@ func (c *conn) Read() (Packet, error) {
 	return p, err
 }
 
-func (c *conn) Write(p Packet) (int, error) {
-	return c.nc.Write(p.Raw())
-}
+func (c *conn) Write(p Packet) (int, error) { return c.nc.Write(p.Data()) }
 
-func (c *conn) RemoteAddr() string {
-	return c.nc.RemoteAddr().String()
-}
+func (c *conn) RemoteAddr() string { return c.nc.RemoteAddr().String() }
 
 func (c *conn) Close() error {
 	err := c.nc.Close()
@@ -54,6 +50,4 @@ func (c *conn) Close() error {
 	return err
 }
 
-func (c *conn) Closed() bool {
-	return c.closed
-}
+func (c *conn) Closed() bool { return c.closed }
