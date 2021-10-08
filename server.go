@@ -160,6 +160,7 @@ func (s *server) handleSession(session Session) {
 			for _, plugin := range s.plugins {
 				p.ResetHead()
 				handled := plugin.OnClientPacket(p.Id(), p, session)
+				handled := plugin.OnClientPacket(p.Type(), p, session)
 
 				if handled {
 					break
@@ -203,7 +204,7 @@ func (s *server) handleSession(session Session) {
 			handled := false
 			for _, plugin := range s.plugins {
 				p.ResetHead()
-				handled := plugin.OnServerPacket(p.Id(), p, session)
+				handled := plugin.OnServerPacket(p.Type(), p, session)
 
 				if handled {
 					break
