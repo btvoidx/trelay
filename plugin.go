@@ -5,7 +5,7 @@ type Plugin interface {
 	Name() string
 
 	// Executed when server starts
-	OnServerStart(s Server)
+	OnServerStart(s Server) Plugin
 
 	// Executed when server stops
 	OnServerStop(s Server)

@@ -101,8 +101,8 @@ func (s *server) SetLogger(log log.FieldLogger) Server {
 }
 
 // Load plugin into a server.
-// Multiple servers can use on instance of a plugin.
-// To forcefully prevent this plugin's OnLoad method should return a unique copy of the plugin.
+// Multiple servers can use one instance of a plugin.
+// To forcefully prevent this behaviour, plugin's OnLoad method may return a unique copy of the plugin.
 // This method is not goroutine-safe.
 func (s *server) LoadPlugin(p Plugin) Server {
 	if s.running {
@@ -110,7 +110,7 @@ func (s *server) LoadPlugin(p Plugin) Server {
 		return s
 	}
 
-	p.OnServerStart(s)
+	p = p.OnServerStart(s)
 	s.plugins = append(s.plugins, p)
 	s.log.Infof("Loaded plugin %s", p.Name())
 
@@ -118,8 +118,8 @@ func (s *server) LoadPlugin(p Plugin) Server {
 }
 
 // Load multiple plugins into a server.
-// Multiple servers can use on instance of a plugin.
-// To forcefully prevent this plugin's OnLoad method should return a unique copy of the plugin.
+// Multiple servers can use one instance of a plugin.
+// To forcefully prevent this behaviour, plugin's OnLoad method may return a unique copy of the plugin.
 // This method is not goroutine-safe.
 func (s *server) LoadPlugins(p []Plugin) Server {
 	for _, plugin := range p {
@@ -159,7 +159,6 @@ func (s *server) handleSession(session Session) {
 			handled := false
 			for _, plugin := range s.plugins {
 				p.ResetHead()
-				handled := plugin.OnClientPacket(p.Id(), p, session)
 				handled := plugin.OnClientPacket(p.Type(), p, session)
 
 				if handled {
