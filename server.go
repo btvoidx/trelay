@@ -3,19 +3,36 @@ package trelay
 import (
 	"errors"
 	"net"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
 type Server interface {
+	// Random int in range [0,1000000000).
 	Id() int
+
+	// Starts server as a goroutine.
 	Start() error
+
+	// Stops server's net.Listener and calls OnServerStop on all loaded plugins.
 	Stop() error
+
+	// Retruns server address.
 	Addr() string
+
+	// Returns remote address to which server routes by default.
 	RemoteAddr() string
+
 	SetLogger(log log.FieldLogger) Server
+
+	// Load plugin into a server.
+	// Multiple servers can use one instance of a plugin.
+	// To forcefully prevent this behaviour, plugin's OnLoad method may return a unique copy of the plugin.
+	//
+	// This method is not goroutine-safe.
 	LoadPlugin(p Plugin) Server
+
+	// Look comment for LoadPlugin().
 	LoadPlugins(p []Plugin) Server
 }
 
@@ -31,7 +48,7 @@ type server struct {
 
 func NewServer(address string, remoteadress string) Server {
 	return &server{
-		id:      time.Now().Nanosecond(),
+		id:      rand.Intn(1000000000),
 		log:     log.StandardLogger(),
 		addr:    address,
 		raddr:   remoteadress,
@@ -60,7 +77,7 @@ func (s *server) Start() (err error) {
 			}
 
 			session := NewSession()
-			session.SetClientConn(NewConn(nc))
+			session.SetClientConn(NewPacketConn(nc))
 
 			s.log.WithFields(log.Fields{
 				"SessionId": session.Id(),
@@ -82,14 +99,19 @@ func (s *server) Start() (err error) {
 }
 
 func (s *server) Stop() (err error) {
-	s.log.Infof("Server stopped")
+	s.log.Infof("Stopping server")
 
 	for _, plugin := range s.plugins {
 		plugin.OnServerStop(s)
 	}
 
 	s.running = false
-	return s.l.Close()
+	err = s.l.Close()
+	if err != nil {
+		s.log.Infof("Server stopped")
+	}
+
+	return err
 }
 
 func (s *server) Addr() string       { return s.addr }
@@ -100,10 +122,6 @@ func (s *server) SetLogger(log log.FieldLogger) Server {
 	return s
 }
 
-// Load plugin into a server.
-// Multiple servers can use one instance of a plugin.
-// To forcefully prevent this behaviour, plugin's OnLoad method may return a unique copy of the plugin.
-// This method is not goroutine-safe.
 func (s *server) LoadPlugin(p Plugin) Server {
 	if s.running {
 		s.log.Errorf("Failed to load plugin %s: server is running", p.Name())
@@ -117,10 +135,6 @@ func (s *server) LoadPlugin(p Plugin) Server {
 	return s
 }
 
-// Load multiple plugins into a server.
-// Multiple servers can use one instance of a plugin.
-// To forcefully prevent this behaviour, plugin's OnLoad method may return a unique copy of the plugin.
-// This method is not goroutine-safe.
 func (s *server) LoadPlugins(p []Plugin) Server {
 	for _, plugin := range p {
 		s.LoadPlugin(plugin)
@@ -135,7 +149,7 @@ func (s *server) handleSession(session Session) {
 		return
 	}
 
-	session.SetServerConn(NewConn(sc))
+	session.SetServerConn(NewPacketConn(sc))
 
 	go func() {
 		for {

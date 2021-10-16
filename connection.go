@@ -5,30 +5,31 @@ import (
 	"net"
 )
 
-type Conn interface {
-	Read() (Packet, error)
-	Write(Packet) (int, error)
+// Wrapper around net.Conn for easy use with packets
+type PacketConn interface {
+	Read() (*Packet, error)
+	Write(*Packet) (int, error)
 	RemoteAddr() string
 	Close() error
 	Closed() bool
 }
 
-type conn struct {
+type pconn struct {
 	nc     net.Conn
 	closed bool
 }
 
-func NewConn(nc net.Conn) Conn {
-	conn := &conn{
+func NewPacketConn(nc net.Conn) PacketConn {
+	pc := &pconn{
 		nc:     nc,
 		closed: false,
 	}
 
-	return conn
+	return pc
 }
 
-func (c *conn) Read() (Packet, error) {
-	p, err := NewPacketFromReader(c.nc)
+func (c *pconn) Read() (*Packet, error) {
+	p, err := ReadPacket(c.nc)
 
 	if err != nil && err == io.EOF {
 		c.Close()
@@ -38,11 +39,11 @@ func (c *conn) Read() (Packet, error) {
 	return p, err
 }
 
-func (c *conn) Write(p Packet) (int, error) { return c.nc.Write(p.Data()) }
+func (c *pconn) Write(p *Packet) (int, error) { return c.nc.Write(p.Data()) }
 
-func (c *conn) RemoteAddr() string { return c.nc.RemoteAddr().String() }
+func (c *pconn) RemoteAddr() string { return c.nc.RemoteAddr().String() }
 
-func (c *conn) Close() error {
+func (c *pconn) Close() error {
 	err := c.nc.Close()
 	if err == nil {
 		c.closed = true
@@ -50,4 +51,4 @@ func (c *conn) Close() error {
 	return err
 }
 
-func (c *conn) Closed() bool { return c.closed }
+func (c *pconn) Closed() bool { return c.closed }

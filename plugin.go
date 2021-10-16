@@ -19,10 +19,10 @@ type Plugin interface {
 	// Executed when client sends a packet.
 	// This method is not goroutine-safe, multiple sessions may invoke it simultaneously.
 	// If this function returns `true`, handling will stop and other plugins won't see it, otherwise packet will get forwarded to each plugin and then to server.
-	OnClientPacket(pid PacketType, packet Packet, session Session) (handled bool)
+	OnClientPacket(pid PacketType, packet *Packet, session Session) (handled bool)
 
 	// Executed when server sends a packet.
 	// This method is not goroutine-safe, multiple sessions may invoke it simultaneously.
 	// If this function returns `true`, handling will stop and other plugins won't see it, otherwise packet will get forwarded to each plugin and then to server.
-	OnServerPacket(pid PacketType, packet Packet, session Session) (handled bool)
+	OnServerPacket(pid PacketType, packet *Packet, session Session) (handled bool)
 }

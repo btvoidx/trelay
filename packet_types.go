@@ -3,8 +3,7 @@ package trelay
 type PacketType byte
 
 const (
-	Any PacketType = iota
-	ConnectRequest
+	ConnectRequest PacketType = iota + 1
 	Disconnect
 	SetUserSlot
 	PlayerInfo
