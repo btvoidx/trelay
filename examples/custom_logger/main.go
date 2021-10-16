@@ -17,7 +17,7 @@ func main() {
 
 	err := server.Start()
 	if err != nil {
-		log.Fatal("An error occured when starting the server: ", err.Error())
+		log.Fatalf("An error occured when starting the server: %s", err.Error())
 	}
 
 	defer server.Stop()
