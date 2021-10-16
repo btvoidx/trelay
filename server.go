@@ -69,6 +69,10 @@ func (s *server) Start() (err error) {
 	s.log.Infof("Server started on %s", s.addr)
 	s.log.Infof("Proxying to %s", s.raddr)
 
+	for _, plugin := range s.plugins {
+		plugin.OnServerStart(s)
+	}
+
 	go func() {
 		for {
 			nc, err := s.l.Accept()
@@ -128,7 +132,7 @@ func (s *server) LoadPlugin(p Plugin) Server {
 		return s
 	}
 
-	p = p.OnServerStart(s)
+	p = p.OnLoad(s)
 	s.plugins = append(s.plugins, p)
 	s.log.Infof("Loaded plugin %s", p.Name())
 
