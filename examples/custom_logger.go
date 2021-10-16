@@ -12,7 +12,7 @@ func main() {
 	// Custom logger
 	log := log.New().WithField("Custom Field", true)
 
-	server := trelay.NewServer("0.0.0.0:7777", "terraria.tk:7777").
+	server := trelay.NewServer("localhost:7777", "terraria.tk:7777").
 		SetLogger(log) // Use custom logger
 
 	err := server.Start()
