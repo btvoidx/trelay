@@ -2,6 +2,7 @@ package trelay
 
 import (
 	"errors"
+	"fmt"
 	"net"
 
 	log "github.com/sirupsen/logrus"
@@ -26,14 +27,12 @@ type Server interface {
 	SetLogger(log log.FieldLogger) Server
 
 	// Load plugin into a server.
-	// Multiple servers can use one instance of a plugin.
-	// To forcefully prevent this behaviour, plugin's OnLoad method may return a unique copy of the plugin.
 	//
 	// This method is not goroutine-safe.
-	LoadPlugin(p Plugin) Server
+	LoadPlugin(loader func(Server) Plugin) Server
 
 	// Look comment for LoadPlugin().
-	LoadPlugins(p []Plugin) Server
+	LoadPlugins(loaders []func(Server) Plugin) Server
 }
 
 type server struct {
@@ -59,6 +58,10 @@ func NewServer(address string, remoteadress string) Server {
 func (s *server) Id() int { return s.id }
 
 func (s *server) Start() (err error) {
+	if s.running {
+		return fmt.Errorf("failed to start server: already running")
+	}
+
 	s.l, err = net.Listen("tcp4", s.addr)
 	if err != nil {
 		return err
@@ -70,7 +73,7 @@ func (s *server) Start() (err error) {
 	s.log.Infof("Proxying to %s", s.raddr)
 
 	for _, plugin := range s.plugins {
-		plugin.OnServerStart(s)
+		plugin.OnServerStart()
 	}
 
 	go func() {
@@ -103,19 +106,29 @@ func (s *server) Start() (err error) {
 }
 
 func (s *server) Stop() (err error) {
+	if !s.running {
+		return nil
+	}
+
 	s.log.Infof("Stopping server")
 
 	for _, plugin := range s.plugins {
-		plugin.OnServerStop(s)
+		plugin.OnServerStop()
+	}
+
+	err = s.l.Close()
+	if err != nil {
+		for _, plugin := range s.plugins {
+			plugin.OnServerStart()
+		}
+
+		return err
 	}
 
 	s.running = false
-	err = s.l.Close()
-	if err != nil {
-		s.log.Infof("Server stopped")
-	}
+	s.log.Infof("Server stopped")
 
-	return err
+	return nil
 }
 
 func (s *server) Addr() string       { return s.addr }
@@ -126,22 +139,22 @@ func (s *server) SetLogger(log log.FieldLogger) Server {
 	return s
 }
 
-func (s *server) LoadPlugin(p Plugin) Server {
+func (s *server) LoadPlugin(loader func(s Server) Plugin) Server {
 	if s.running {
-		s.log.Errorf("Failed to load plugin %s: server is running", p.Name())
+		s.log.Errorf("Failed to load plugin: server is running")
 		return s
 	}
 
-	p = p.OnLoad(s)
+	p := loader(s)
 	s.plugins = append(s.plugins, p)
 	s.log.Infof("Loaded plugin %s", p.Name())
 
 	return s
 }
 
-func (s *server) LoadPlugins(p []Plugin) Server {
-	for _, plugin := range p {
-		s.LoadPlugin(plugin)
+func (s *server) LoadPlugins(loaders []func(s Server) Plugin) Server {
+	for _, loader := range loaders {
+		s.LoadPlugin(loader)
 	}
 	return s
 }
