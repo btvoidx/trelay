@@ -24,6 +24,7 @@ type Server interface {
 	// Returns remote address to which server routes by default.
 	RemoteAddr() string
 
+	Logger() log.FieldLogger
 	SetLogger(log log.FieldLogger) Server
 
 	// Load plugin into a server.
@@ -134,6 +135,7 @@ func (s *server) Stop() (err error) {
 func (s *server) Addr() string       { return s.addr }
 func (s *server) RemoteAddr() string { return s.raddr }
 
+func (s *server) Logger() log.FieldLogger { return s.log }
 func (s *server) SetLogger(log log.FieldLogger) Server {
 	s.log = log
 	return s
