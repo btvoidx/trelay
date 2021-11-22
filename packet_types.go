@@ -27,8 +27,8 @@ const (
 	UpdateItemOwner
 	NPCUpdate
 	StrikeNPCwithHeldItem
-	ChatMessage
-	PlayerDamage
+	Null2
+	Null3
 	ProjectileUpdate
 	NPCStrike
 	DestroyProjectile
@@ -143,4 +143,6 @@ const (
 	ClientSyncedInventory
 	SetCountsAsHostForGameplay
 	SetMiscEventValues
+	RequestLucyPopup
+	SyncProjectileTrackers
 )
