@@ -46,12 +46,12 @@ type server struct {
 	raddr   string
 }
 
-func NewServer(address string, remoteadress string) Server {
+func NewServer(address string, remoteaddress string) Server {
 	return &server{
 		id:      rand.Intn(1000000000),
 		log:     log.StandardLogger(),
 		addr:    address,
-		raddr:   remoteadress,
+		raddr:   remoteaddress,
 		plugins: make([]Plugin, 0),
 	}
 }
