@@ -15,13 +15,20 @@ func (p *PacketWriter) ensurePointerIsAccurate() {
 
 func (pw *PacketWriter) Packet() *Packet {
 	binary.LittleEndian.PutUint16(pw.buf[0:2], pw.ptr)
-
 	return &Packet{ptr: 3, buf: pw.buf}
 }
 
 func (pw *PacketWriter) SetType(t PacketType) *PacketWriter {
 	pw.ensurePointerIsAccurate()
 	pw.buf[2] = byte(t)
+	return pw
+}
+
+func (pw *PacketWriter) PutBytes(v []byte) *PacketWriter {
+	pw.ensurePointerIsAccurate()
+	copy(pw.buf[pw.ptr:], v)
+	pw.ptr += uint16(len(v))
+
 	return pw
 }
 
