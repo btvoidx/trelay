@@ -70,8 +70,8 @@ func (s *server) Start() (err error) {
 
 	s.running = true
 
-	s.log.Infof("Server started on %s", s.addr)
-	s.log.Infof("Proxying to %s", s.raddr)
+	s.log.Infof("Server started on \"%s\"", s.addr)
+	s.log.Infof("Proxying to \"%s\"", s.raddr)
 
 	for _, plugin := range s.plugins {
 		plugin.OnServerStart()
@@ -149,7 +149,7 @@ func (s *server) LoadPlugin(loader func(s Server) Plugin) Server {
 
 	p := loader(s)
 	s.plugins = append(s.plugins, p)
-	s.log.Infof("Loaded plugin %s", p.Name())
+	s.log.Infof("Loaded plugin \"%s\"", p.Name())
 
 	return s
 }
