@@ -23,6 +23,14 @@ func TestPacketPutByte(t *testing.T) {
 	assert.Equal([]byte{4, 0, 0, 1}, p.Data())
 }
 
+func TestPacketPutBytes(t *testing.T) {
+	assert := assert.New(t)
+	var pw trelay.PacketWriter
+	p := pw.PutBytes([]byte{0, 255, 19, 81}).Packet()
+
+	assert.Equal([]byte{7, 0, 0, 0, 255, 19, 81}, p.Data())
+}
+
 func TestPacketPutUint16(t *testing.T) {
 	assert := assert.New(t)
 	var pw trelay.PacketWriter
