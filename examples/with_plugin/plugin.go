@@ -18,12 +18,10 @@ func (*plugin) OnServerStop()                   { fmt.Println("plugin.OnServerSt
 func (*plugin) OnSessionOpen(s trelay.Session)  { fmt.Println("plugin.OnSessionOpen") }
 func (*plugin) OnSessionClose(s trelay.Session) { fmt.Println("plugin.OnSessionClose") }
 
-func (*plugin) OnClientPacket(pid trelay.PacketType, packet *trelay.Packet, session trelay.Session) (handled bool) {
+func (*plugin) OnClientPacket(packet *trelay.Packet, session trelay.Session, ctx trelay.PacketContext) {
 	fmt.Println("plugin.OnClientPacket")
-	return
 }
 
-func (*plugin) OnServerPacket(pid trelay.PacketType, packet *trelay.Packet, session trelay.Session) (handled bool) {
+func (*plugin) OnServerPacket(packet *trelay.Packet, session trelay.Session, ctx trelay.PacketContext) {
 	fmt.Println("plugin.OnServerPacket")
-	return
 }

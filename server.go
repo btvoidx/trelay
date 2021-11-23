@@ -189,18 +189,22 @@ func (s *server) handleSession(session Session) {
 				continue
 			}
 
-			handled := false
+			ctx := &packetcontext{
+				handled: false,
+				server:  s,
+			}
+
 			for _, plugin := range s.plugins {
 				p.ResetHead()
-				handled := plugin.OnClientPacket(p.Type(), p, session)
+				plugin.OnClientPacket(p, session, ctx)
+			}
 
-				if handled {
-					break
-				}
+			if ctx.handled {
+				continue
 			}
 
 			sc := session.ServerConn()
-			if !handled && sc != nil && !sc.Closed() {
+			if sc != nil && !sc.Closed() {
 				sc.Write(p) //nolint:errcheck
 			}
 		}
@@ -233,18 +237,22 @@ func (s *server) handleSession(session Session) {
 				continue
 			}
 
-			handled := false
+			ctx := &packetcontext{
+				handled: false,
+				server:  s,
+			}
+
 			for _, plugin := range s.plugins {
 				p.ResetHead()
-				handled := plugin.OnServerPacket(p.Type(), p, session)
+				plugin.OnServerPacket(p, session, ctx)
+			}
 
-				if handled {
-					break
-				}
+			if ctx.handled {
+				continue
 			}
 
 			cc := session.ClientConn()
-			if !handled && cc != nil && !cc.Closed() {
+			if cc != nil && !cc.Closed() {
 				cc.Write(p) //nolint:errcheck
 			}
 		}

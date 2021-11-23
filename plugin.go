@@ -17,14 +17,14 @@ type Plugin interface {
 	OnSessionClose(s Session)
 
 	// Executed when client sends a packet.
-	// If this function returns `true`, handling will stop and other plugins won't see it, otherwise packet will get forwarded to each plugin and then to server.
+	// Call `ctx.SetHandled()` to prevent forwarding this packet to server.
 	//
 	// This method is not goroutine-safe, multiple sessions may invoke it simultaneously.
-	OnClientPacket(pid PacketType, packet *Packet, session Session) (handled bool)
+	OnClientPacket(packet *Packet, session Session, ctx PacketContext)
 
 	// Executed when server sends a packet.
-	// If this function returns `true`, handling will stop and other plugins won't see it, otherwise packet will get forwarded to each plugin and then to client.
+	// Call `ctx.SetHandled()` to prevent forwarding this packet to client.
 	//
 	// This method is not goroutine-safe, multiple sessions may invoke it simultaneously.
-	OnServerPacket(pid PacketType, packet *Packet, session Session) (handled bool)
+	OnServerPacket(packet *Packet, session Session, ctx PacketContext)
 }
