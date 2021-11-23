@@ -87,6 +87,14 @@ func (p *Packet) ReadByte() byte {
 	return v
 }
 
+func (p *Packet) ReadBytes(l uint16) []byte {
+	p.ensurePointerIsAccurate()
+	buf := make([]byte, l)
+	copy(buf, p.buf[p.ptr:p.ptr+l])
+	p.ptr += l
+	return buf
+}
+
 func (p *Packet) ReadUint16() uint16 {
 	p.ensurePointerIsAccurate()
 	v := binary.LittleEndian.Uint16(p.buf[p.ptr : p.ptr+2])
@@ -146,6 +154,11 @@ func (p *Packet) ReadString() string {
 
 func (p *Packet) DiscardByte() *Packet {
 	p.ReadByte()
+	return p
+}
+
+func (p *Packet) DiscardBytes(l uint16) *Packet {
+	p.ReadBytes(l)
 	return p
 }
 

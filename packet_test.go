@@ -54,6 +54,19 @@ func TestReadByte(t *testing.T) {
 	}
 }
 
+func TestReadBytes(t *testing.T) {
+	assert := assert.New(t)
+	r := bytes.NewReader([]byte{6, 0, 0, 5, 6, 7})
+	p, err := trelay.ReadPacket(r)
+
+	if assert.NoError(err) {
+		buf := p.ReadBytes(3)
+		assert.Equal(byte(5), buf[0])
+		assert.Equal(byte(6), buf[1])
+		assert.Equal(byte(7), buf[2])
+	}
+}
+
 func TestReadUint16(t *testing.T) {
 	assert := assert.New(t)
 	r := bytes.NewReader([]byte{5, 0, 1, 172, 87})
