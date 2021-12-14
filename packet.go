@@ -95,6 +95,11 @@ func (p *Packet) ReadBytes(l uint16) []byte {
 	return buf
 }
 
+func (p *Packet) ReadBool() bool {
+	v := p.ReadByte()
+	return v != 0
+}
+
 func (p *Packet) ReadUint16() uint16 {
 	p.ensurePointerIsAccurate()
 	v := binary.LittleEndian.Uint16(p.buf[p.ptr : p.ptr+2])
@@ -154,6 +159,11 @@ func (p *Packet) ReadString() string {
 
 func (p *Packet) DiscardByte() *Packet {
 	p.ReadByte()
+	return p
+}
+
+func (p *Packet) DiscardBool() *Packet {
+	p.DiscardByte()
 	return p
 }
 
