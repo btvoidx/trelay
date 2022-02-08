@@ -3,20 +3,8 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
-        with:
-          go-version: 1.17.1
-
-      - run: go mod download
-      - run: go build .
-
   lint:
-    name: Lint
+    name: Golang-CI Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

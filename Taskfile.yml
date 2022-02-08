@@ -1,0 +1,17 @@
+version: 3
+
+tasks:
+  default:
+    cmds:
+      - task -l
+
+  test:
+    desc: "Run tests"
+    cmds:
+      - go test -v ./...
+
+  lint:
+    desc: "Run golangci linter"
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - golangci-lint run
