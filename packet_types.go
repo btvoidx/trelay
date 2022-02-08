@@ -17,7 +17,7 @@ const (
 	SpawnPlayer
 	UpdatePlayer
 	PlayerActive
-	Null
+	_
 	PlayerHP
 	ModifyTile
 	Time
@@ -27,8 +27,8 @@ const (
 	UpdateItemOwner
 	NPCUpdate
 	StrikeNPCwithHeldItem
-	Null2
-	Null3
+	_
+	_
 	ProjectileUpdate
 	NPCStrike
 	DestroyProjectile
@@ -69,7 +69,7 @@ const (
 	PaintWall
 	PlayerOrNPCTeleport
 	HealOtherPlayer
-	Placeholder
+	_
 	ClientUUID
 	GetChestName
 	CatchNPC_bugs
@@ -96,7 +96,7 @@ const (
 	SyncEmoteBubble
 	SyncExtraValue
 	SocialHandshake
-	Deprecated
+	_
 	KillPortal
 	PlayerTeleportThroughPortal
 	NotifyPlayerNPCKilled
