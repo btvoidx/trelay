@@ -1,27 +1,28 @@
 package trelay
 
-type PacketContext interface {
-	Handled() bool
-	SetHandled()
-	Server() Server
-}
-
-type packetcontext struct {
+type PacketContext struct {
+	packet  *Packet
 	handled bool
-	server  Server
+	session *Session
 }
 
-// Returns true if a plugin already marked this packet as handled
-func (pc *packetcontext) Handled() bool {
+// Returns the received packet and resets its head
+func (pc *PacketContext) Packet() *Packet {
+	pc.packet.ResetHead()
+	return pc.packet
+}
+
+// Returns true if a plugin has marked this packet as handled
+func (pc *PacketContext) Handled() bool {
 	return pc.handled
 }
 
-// Marks packet as handled. Other plugins will still get it, but not the intended packet reciever
-func (pc *packetcontext) SetHandled() {
+// Marks packet as handled. Other plugins will still receive it, but it will not be sent over network
+func (pc *PacketContext) SetHandled() {
 	pc.handled = true
 }
 
-// Server which handles the packet
-func (pc *packetcontext) Server() Server {
-	return pc.server
+// Client connection
+func (pc *PacketContext) Session() *Session {
+	return pc.session
 }

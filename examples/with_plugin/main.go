@@ -9,7 +9,10 @@ import (
 )
 
 func main() {
-	server := trelay.NewServer("localhost:7777", "terraria.tk:7777").
+	server := trelay.NewServer(trelay.Options{
+		Addr:       "localhost:7777",
+		RemoteAddr: "terraria.tk:7777",
+	}).
 		LoadPlugin(GetExamplePlugin) // look plugin.go
 
 	err := server.Start()
