@@ -2,48 +2,48 @@ package trelay
 
 import "encoding/binary"
 
+// Packet writer easy creation of custom tcp packets
 type PacketWriter struct {
-	ptr uint16
-	buf [65535]byte
+	buf []byte
 }
 
-func (p *PacketWriter) ensureAccuratePointer() {
-	if p.ptr < 3 {
-		p.ptr = 3
+func (pw *PacketWriter) setupBuffer() {
+	if len(pw.buf) < 3 {
+		// 128 bytes is about right of a tradeoff between allocating more and allocating multiple times for shorter and longer packets
+		pw.buf = make([]byte, 3, 128)
 	}
 }
 
 func (pw *PacketWriter) Packet() *Packet {
-	binary.LittleEndian.PutUint16(pw.buf[0:2], pw.ptr)
-	return &Packet{ptr: 3, buf: pw.buf[0:pw.ptr]}
+	binary.LittleEndian.PutUint16(pw.buf, uint16(len(pw.buf)))
+	buf := make([]byte, len(pw.buf))
+	copy(buf, pw.buf)
+	return &Packet{ptr: 3, buf: buf}
 }
 
 func (pw *PacketWriter) SetType(t PacketType) *PacketWriter {
-	pw.ensureAccuratePointer()
+	pw.setupBuffer()
 	pw.buf[2] = byte(t)
 	return pw
 }
 
 func (pw *PacketWriter) WriteBytes(v []byte) *PacketWriter {
-	pw.ensureAccuratePointer()
-	copy(pw.buf[pw.ptr:], v)
-	pw.ptr += uint16(len(v))
-
+	pw.setupBuffer()
+	pw.buf = append(pw.buf, v...)
 	return pw
 }
 
 func (pw *PacketWriter) WriteByte(v byte) *PacketWriter {
-	pw.ensureAccuratePointer()
-	pw.buf[pw.ptr] = v
-	pw.ptr += 1
-
+	pw.setupBuffer()
+	pw.buf = append(pw.buf, v)
 	return pw
 }
 
 func (pw *PacketWriter) WriteUint16(v uint16) *PacketWriter {
-	pw.ensureAccuratePointer()
-	binary.LittleEndian.PutUint16(pw.buf[pw.ptr:pw.ptr+2], v)
-	pw.ptr += 2
+	pw.setupBuffer()
+	vbuf := make([]byte, 2)
+	binary.LittleEndian.PutUint16(vbuf, v)
+	pw.buf = append(pw.buf, vbuf...)
 	return pw
 }
 
@@ -52,9 +52,10 @@ func (pw *PacketWriter) WriteInt16(v int16) *PacketWriter {
 }
 
 func (pw *PacketWriter) WriteUint32(v uint32) *PacketWriter {
-	pw.ensureAccuratePointer()
-	binary.LittleEndian.PutUint32(pw.buf[pw.ptr:pw.ptr+4], v)
-	pw.ptr += 4
+	pw.setupBuffer()
+	vbuf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(vbuf, v)
+	pw.buf = append(pw.buf, vbuf...)
 	return pw
 }
 
@@ -63,9 +64,10 @@ func (pw *PacketWriter) WriteInt32(v int32) *PacketWriter {
 }
 
 func (pw *PacketWriter) WriteUint64(v uint64) *PacketWriter {
-	pw.ensureAccuratePointer()
-	binary.LittleEndian.PutUint64(pw.buf[pw.ptr:pw.ptr+8], v)
-	pw.ptr += 8
+	pw.setupBuffer()
+	vbuf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(vbuf, v)
+	pw.buf = append(pw.buf, vbuf...)
 	return pw
 }
 
@@ -74,18 +76,13 @@ func (pw *PacketWriter) PutInt64(v int64) *PacketWriter {
 }
 
 func (pw *PacketWriter) WriteString(v string) *PacketWriter {
-	pw.ensureAccuratePointer()
-	strlen := len(v)
-
-	if strlen >= 128 {
-		pw.WriteByte(byte((strlen % 128) + 128))
-		pw.WriteByte(byte(strlen / 128))
+	pw.setupBuffer()
+	if l := len(v); l >= 128 {
+		pw.WriteByte(byte((l % 128) + 128))
+		pw.WriteByte(byte(l / 128))
 	} else {
-		pw.WriteByte(byte(strlen))
+		pw.WriteByte(byte(l))
 	}
-
-	copy(pw.buf[pw.ptr:], []byte(v))
-	pw.ptr += uint16(strlen)
-
+	pw.buf = append(pw.buf, v...)
 	return pw
 }
