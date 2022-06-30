@@ -1,4 +1,4 @@
-package trelay
+package packet
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBadLengthPacket(t *testing.T) {
+func TestPacketBadLength(t *testing.T) {
 	assert := assert.New(t)
 	r := bytes.NewReader([]byte{2, 0})
 	_, err := ReadPacket(r)
@@ -16,7 +16,7 @@ func TestBadLengthPacket(t *testing.T) {
 	assert.EqualError(err, "bad packet length")
 }
 
-func TestReadPacketEOF(t *testing.T) {
+func TestPacketReadEOF(t *testing.T) {
 	assert := assert.New(t)
 	r := bytes.NewReader([]byte{10, 0, 1, 0, 0, 0})
 	_, err := ReadPacket(r)
@@ -24,7 +24,7 @@ func TestReadPacketEOF(t *testing.T) {
 	assert.EqualError(err, io.EOF.Error())
 }
 
-func TestCorrectPacketLength(t *testing.T) {
+func TestPacketLength(t *testing.T) {
 	assert := assert.New(t)
 	r := bytes.NewReader([]byte{6, 0, 1, 0, 0, 1})
 	p, err := ReadPacket(r)
@@ -52,7 +52,7 @@ func TestPacketResetHead(t *testing.T) {
 	assert.Equal(uint16(3), p.ptr)
 }
 
-func TestCorrectPacketType(t *testing.T) {
+func TestPacketType(t *testing.T) {
 	assert := assert.New(t)
 	r := bytes.NewReader([]byte{3, 0, byte(ConnectRequest)}) // Valid packet
 	p, err := ReadPacket(r)
@@ -62,7 +62,7 @@ func TestCorrectPacketType(t *testing.T) {
 	}
 }
 
-func TestReadByte(t *testing.T) {
+func TestPacketReadByte(t *testing.T) {
 	assert := assert.New(t)
 	r := bytes.NewReader([]byte{4, 0, 0, 5})
 	p, err := ReadPacket(r)
@@ -79,7 +79,7 @@ func TestReadByte(t *testing.T) {
 	assert.Equal(byte(5), v)
 }
 
-func TestReadBytes(t *testing.T) {
+func TestPacketReadBytes(t *testing.T) {
 	assert := assert.New(t)
 	r := bytes.NewReader([]byte{6, 0, 0, 5, 6, 7})
 	p, err := ReadPacket(r)
@@ -98,7 +98,7 @@ func TestReadBytes(t *testing.T) {
 	assert.Equal(byte(7), buf[2])
 }
 
-func TestReadUint16(t *testing.T) {
+func TestPacketReadUint16(t *testing.T) {
 	assert := assert.New(t)
 	r := bytes.NewReader([]byte{5, 0, 1, 172, 87})
 	p, err := ReadPacket(r)
@@ -115,7 +115,7 @@ func TestReadUint16(t *testing.T) {
 	assert.Equal(uint16(22444), v)
 }
 
-func TestReadInt16(t *testing.T) {
+func TestPacketReadInt16(t *testing.T) {
 	assert := assert.New(t)
 	r := bytes.NewReader([]byte{5, 0, 1, 117, 255})
 	p, err := ReadPacket(r)
@@ -132,7 +132,7 @@ func TestReadInt16(t *testing.T) {
 	assert.Equal(int16(-139), v)
 }
 
-func TestReadString(t *testing.T) {
+func TestPacketReadString(t *testing.T) {
 	assert := assert.New(t)
 	// Encoded string: fdec2c95-f203-47b4-8256-3c3b156b251e
 	r := bytes.NewReader([]byte{40, 0, 68, 36, 102, 100, 101, 99, 50, 99, 57, 53, 45, 102, 50, 48, 51, 45, 52, 55, 98, 52, 45, 56, 50, 53, 54, 45, 51, 99, 51, 98, 49, 53, 54, 98, 50, 53, 49, 101})

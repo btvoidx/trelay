@@ -1,4 +1,4 @@
-package trelay
+package packet
 
 import (
 	"encoding/binary"
@@ -11,7 +11,7 @@ type Packet struct {
 	buf []byte
 }
 
-// Reads exactly one packet from io.Reader. Packet pointer is nil if an error occurs even if most of the packet was read successfully
+// Reads exactly one packet from io.Reader. *Packet is nil if an error occurs even if most of the packet was read successfully
 func ReadPacket(r io.Reader) (*Packet, error) {
 	p := &Packet{ptr: 3, buf: make([]byte, 3)}
 
@@ -21,7 +21,7 @@ func ReadPacket(r io.Reader) (*Packet, error) {
 		return p, err
 	}
 
-	if p.Length() < 3 || p.Length() > 65535 {
+	if p.Length() < 3 {
 		return nil, fmt.Errorf("bad packet length")
 	}
 
@@ -52,8 +52,8 @@ func ReadPacket(r io.Reader) (*Packet, error) {
 	return p, nil
 }
 
-func (p Packet) String() string {
-	return fmt.Sprintf("{type:%d, len:%d}", p.Type(), p.Length())
+func (p *Packet) String() string {
+	return fmt.Sprintf("Packet{type:%d, len:%d}", p.Type(), p.Length())
 }
 
 func (p *Packet) ensureAccuratePointer() {

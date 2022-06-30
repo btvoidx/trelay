@@ -1,4 +1,4 @@
-package trelay
+package packet
 
 type PacketType byte
 

@@ -1,45 +1,48 @@
-package trelay
+package packet
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+)
 
-// Packet writer easy creation of custom tcp packets
-type PacketWriter struct {
+// W is used to efficiently build a terraria tcp packet
+// Do not copy a non-zero Writer.
+type Writer struct {
 	buf []byte
 }
 
-func (pw *PacketWriter) setupBuffer() {
+func (pw *Writer) setupBuffer() {
 	if len(pw.buf) < 3 {
-		// 128 bytes is about right of a tradeoff between allocating more and allocating multiple times for shorter and longer packets
-		pw.buf = make([]byte, 3, 128)
+		// Most packets are rather short, so allocating 16 bytes is more than enough at first.
+		pw.buf = make([]byte, 3, 16)
 	}
 }
 
-func (pw *PacketWriter) Packet() *Packet {
+func (pw *Writer) Packet() *Packet {
 	binary.LittleEndian.PutUint16(pw.buf, uint16(len(pw.buf)))
 	buf := make([]byte, len(pw.buf))
 	copy(buf, pw.buf)
 	return &Packet{ptr: 3, buf: buf}
 }
 
-func (pw *PacketWriter) SetType(t PacketType) *PacketWriter {
+func (pw *Writer) SetType(t PacketType) *Writer {
 	pw.setupBuffer()
 	pw.buf[2] = byte(t)
 	return pw
 }
 
-func (pw *PacketWriter) WriteBytes(v []byte) *PacketWriter {
+func (pw *Writer) WriteBytes(v []byte) *Writer {
 	pw.setupBuffer()
 	pw.buf = append(pw.buf, v...)
 	return pw
 }
 
-func (pw *PacketWriter) WriteByte(v byte) *PacketWriter {
+func (pw *Writer) WriteByte(v byte) *Writer {
 	pw.setupBuffer()
 	pw.buf = append(pw.buf, v)
 	return pw
 }
 
-func (pw *PacketWriter) WriteUint16(v uint16) *PacketWriter {
+func (pw *Writer) WriteUint16(v uint16) *Writer {
 	pw.setupBuffer()
 	vbuf := make([]byte, 2)
 	binary.LittleEndian.PutUint16(vbuf, v)
@@ -47,11 +50,11 @@ func (pw *PacketWriter) WriteUint16(v uint16) *PacketWriter {
 	return pw
 }
 
-func (pw *PacketWriter) WriteInt16(v int16) *PacketWriter {
+func (pw *Writer) WriteInt16(v int16) *Writer {
 	return pw.WriteUint16(uint16(v))
 }
 
-func (pw *PacketWriter) WriteUint32(v uint32) *PacketWriter {
+func (pw *Writer) WriteUint32(v uint32) *Writer {
 	pw.setupBuffer()
 	vbuf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(vbuf, v)
@@ -59,11 +62,11 @@ func (pw *PacketWriter) WriteUint32(v uint32) *PacketWriter {
 	return pw
 }
 
-func (pw *PacketWriter) WriteInt32(v int32) *PacketWriter {
+func (pw *Writer) WriteInt32(v int32) *Writer {
 	return pw.WriteUint32(uint32(v))
 }
 
-func (pw *PacketWriter) WriteUint64(v uint64) *PacketWriter {
+func (pw *Writer) WriteUint64(v uint64) *Writer {
 	pw.setupBuffer()
 	vbuf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(vbuf, v)
@@ -71,11 +74,11 @@ func (pw *PacketWriter) WriteUint64(v uint64) *PacketWriter {
 	return pw
 }
 
-func (pw *PacketWriter) PutInt64(v int64) *PacketWriter {
+func (pw *Writer) PutInt64(v int64) *Writer {
 	return pw.WriteUint64(uint64(v))
 }
 
-func (pw *PacketWriter) WriteString(v string) *PacketWriter {
+func (pw *Writer) WriteString(v string) *Writer {
 	pw.setupBuffer()
 	if l := len(v); l >= 128 {
 		pw.WriteByte(byte((l % 128) + 128))
