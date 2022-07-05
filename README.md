@@ -1,10 +1,16 @@
-## Using this in any serious way is discouraged, as the project is in a stage where I can break stuff because I decide to
-You can run an example via `cd examples/with_plugin && go run .`.
+### Using this in any serious way is discouraged, as the project is in a stage where I can break stuff because I decide to
 
-# trelay
-Pluggable Terraria MITM-proxy for network analysis and packet handling.
+## trelay
+A network router for Terraria Servers, scriptable with Lua.
 
-# todo
-- [ ] readme
-- [ ] more testing
-- [ ] more examples
+## Usage
+
+**Not yet**
+
+## Api docs
+
+**Not yet**
+
+## Development
+
+The project uses docker with [toast](https://github.com/stepchowfun/toast) task runner. Relevant tasks can be viewed by running `toast --list`.

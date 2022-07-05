@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 )
 
-// W is used to efficiently build a terraria tcp packet
+// Writer is used to efficiently build a terraria tcp packet
 // Do not copy a non-zero Writer.
 type Writer struct {
 	buf []byte

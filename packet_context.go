@@ -1,13 +1,16 @@
 package trelay
 
+import (
+	"github.com/btvoidx/trelay/packet"
+)
+
 type PacketContext struct {
-	packet  *Packet
+	packet  *packet.Packet
 	handled bool
-	session *Session
 }
 
 // Returns the received packet and resets its head
-func (pc *PacketContext) Packet() *Packet {
+func (pc *PacketContext) Packet() *packet.Packet {
 	pc.packet.ResetHead()
 	return pc.packet
 }
@@ -20,9 +23,4 @@ func (pc *PacketContext) Handled() bool {
 // Marks packet as handled. Other plugins will still receive it, but it will not be sent over network
 func (pc *PacketContext) SetHandled() {
 	pc.handled = true
-}
-
-// Client connection
-func (pc *PacketContext) Session() *Session {
-	return pc.session
 }
