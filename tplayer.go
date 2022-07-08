@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/btvoidx/trelay/packet"
+	lua "github.com/yuin/gopher-lua"
 )
 
 // TPlayer represents both a client and server connections, as well as their actual Terraria player
@@ -41,10 +42,10 @@ type tplayer struct {
 	name    string
 }
 
-func (tp *tplayer) Index() int      { return tp.index }
-func (tp *tplayer) Version() string { return tp.version }
-func (tp *tplayer) Uuid() string    { return tp.uuid }
-func (tp *tplayer) Name() string    { return tp.name }
+func (tpl *tplayer) Index() int      { return tpl.index }
+func (tpl *tplayer) Version() string { return tpl.version }
+func (tpl *tplayer) Uuid() string    { return tpl.uuid }
+func (tpl *tplayer) Name() string    { return tpl.name }
 
 // // The server the player is currently connected to
 // //
@@ -62,7 +63,7 @@ func (tp *tplayer) Name() string    { return tp.name }
 // // Use options to connect to a password-protected server
 // func (tp *tplayer) ChangeServer(addr string, o ...ChangeServerOptions) {}
 
-func (tp *tplayer) Disconnect(reason string, a ...any) {
+func (tpl *tplayer) Disconnect(reason string, a ...any) {
 	reason = fmt.Sprintf(reason, a...)
 
 	var pw packet.Writer
@@ -70,6 +71,22 @@ func (tp *tplayer) Disconnect(reason string, a ...any) {
 	pw.WriteByte(0)
 	pw.WriteString(reason)
 
-	tp.conn.Write(pw.Packet().Data()) //nolint:errcheck
-	tp.conn.Close()
+	tpl.conn.Write(pw.Packet().Data()) //nolint:errcheck
+	tpl.conn.Close()
+}
+
+func (tpl *tplayer) toTable(L *lua.LState) *lua.LTable {
+	t := L.NewTable()
+
+	t.RawSetString("index", lua.LNumber(tpl.Index()))
+	t.RawSetString("version", lua.LString(tpl.Version()))
+	t.RawSetString("name", lua.LString(tpl.Name()))
+	t.RawSetString("uuid", lua.LString(tpl.Uuid()))
+
+	t.RawSetString("disconnect", L.NewFunction(func(l *lua.LState) int {
+		tpl.Disconnect(l.CheckString(1))
+		return 0
+	}))
+
+	return t
 }

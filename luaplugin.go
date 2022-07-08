@@ -7,6 +7,8 @@ import (
 )
 
 type luaplugin struct {
+	path string
+
 	*lua.LState
 	sync.Mutex
 }

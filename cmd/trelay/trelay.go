@@ -20,26 +20,32 @@ func main() {
 	pflag.StringVarP(&addr, "address", "a", "0.0.0.0:7777", "network address to start trelay server on")
 	pflag.Parse()
 
-	server := trelay.NewTrelayServer(trelay.Options{
+	trelay := trelay.NewTrelayServer(trelay.Options{
 		MaxPlayers: 1984,
 	})
 
 	for _, path := range plugins {
 		fmt.Printf("Loading plugin: %s\n", path)
-		if err := server.LoadPlugin(path); err != nil {
+		if err := trelay.LoadPlugin(path); err != nil {
 			fmt.Printf("An error occured while loading plugin '%s': %v\n", path, err)
 		}
 	}
 
 	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-		<-c
-		os.Exit(1)
+		fmt.Printf("Starting trelay on %s\n", addr)
+
+		if err := trelay.Start(addr); err != nil {
+			fmt.Printf("Alas, an error: %v\n", err)
+		}
 	}()
 
-	fmt.Printf("Starting trelay on %s\n", addr)
-	if err := server.Start(addr); err != nil {
-		fmt.Printf("Alas, an error: %v\n", err)
-	}
+	go func() {
+		// todo fmt.Printf("Starting rest api on %s\n", addr)
+	}()
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+
+	trelay.Stop()
 }
