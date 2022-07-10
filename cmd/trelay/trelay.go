@@ -16,7 +16,7 @@ func main() {
 		addr    string
 	)
 
-	pflag.StringArrayVarP(&plugins, "plugins", "p", []string{"plugins"}, "list of directories to pull plugins from or paths directly to plugins")
+	pflag.StringArrayVarP(&plugins, "plugin", "p", []string{}, "a path to plugin directory; can be given multiple times to load multiple plugins")
 	pflag.StringVarP(&addr, "address", "a", "0.0.0.0:7777", "network address to start trelay server on")
 	pflag.Parse()
 
