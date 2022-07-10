@@ -3,6 +3,7 @@ package trelay
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"os"
@@ -74,8 +75,8 @@ func (t *trelay) LoadPlugin(path string) error {
 	}
 
 	t.plugins = append(t.plugins, &luaplugin{
-		LState: L,
-		Mutex:  sync.Mutex{},
+		lstate: L,
+		mu:     sync.Mutex{},
 	})
 	return nil
 }
@@ -174,7 +175,7 @@ func (t *trelay) handshake(conn net.Conn) (*tplayer, bool) {
 		var err error
 		p, err := packet.ReadPacket(conn)
 		if err != nil {
-			fmt.Printf("%s disconnected\n", conn.RemoteAddr())
+			fmt.Printf("%s failed handshake\n", conn.RemoteAddr())
 			conn.Close()
 			return nil, false
 		}
@@ -226,8 +227,6 @@ func (t *trelay) handshake(conn net.Conn) (*tplayer, bool) {
 				continue
 			}
 
-			fmt.Printf("%s (%s) has requested world data!\n", conn.RemoteAddr(), tpl.name)
-
 			tpl.index = t.getOpenPlayerSlot()
 
 			if tpl.index < 0 {
@@ -242,6 +241,7 @@ func (t *trelay) handshake(conn net.Conn) (*tplayer, bool) {
 }
 
 func (t *trelay) connectionLoop(tpl *tplayer) {
+	fmt.Printf("%s (%s) has connected!\n", tpl.conn.RemoteAddr(), tpl.name)
 	t.callPlugins("on_connect", func(L *lua.LState) int {
 		t := L.NewTable()
 		t.RawSetString("player", tpl.toTable(L))
@@ -249,29 +249,46 @@ func (t *trelay) connectionLoop(tpl *tplayer) {
 		return 1
 	})
 
-	// go func() {
-	// 	for {
-	// 		p, err := packet.ReadPacket(tpl.conn)
-	// 		// if err == io.EOF {
-	// 		// 	return
-	// 		// }
-	// 		if err != nil {
-	// 			continue
-	// 		}
+	defer fmt.Printf("%s (%s) has disconnected!\n", tpl.conn.RemoteAddr(), tpl.name)
+	defer t.callPlugins("on_disconnect", func(L *lua.LState) int {
+		t := L.NewTable()
+		t.RawSetString("player", tpl.toTable(L))
+		L.Push(t)
+		return 1
+	})
 
-	// 		ctx := &PacketContext{
-	// 			packet: p,
-	// 		}
+	func() {
+		for {
+			_, err := packet.ReadPacket(tpl.conn)
+			if err == io.EOF {
+				return
+			}
 
-	// 		if ctx.handled {
-	// 			continue
-	// 		}
+			if err != nil {
+				tpl.Disconnect("Network tampering detected")
+				return
+			}
 
-	// 		// if session.Server.Write(p) != nil {
-	// 		// 	break
-	// 		// }
-	// 	}
-	// }()
+			var handled bool
+
+			t.callPlugins("on_player_packet", func(L *lua.LState) int {
+				t := L.NewTable()
+				t.RawSetString("player", tpl.toTable(L))
+				t.RawSetString("handled", lua.LBool(handled))
+				t.RawSetString("set_handled", luafnSetPacketHandled(L, &handled))
+				L.Push(t)
+				return 1
+			})
+
+			if handled {
+				continue
+			}
+
+			// if session.Server.Write(p) != nil {
+			// 	break
+			// }
+		}
+	}()
 
 	// go func() {
 	// 	for {
@@ -300,26 +317,25 @@ func (t *trelay) connectionLoop(tpl *tplayer) {
 	// }()
 }
 
+// Calls all plguins sequentially, but call order is *not* guaranteed
 func (t *trelay) callPlugins(fname string, ctxfn lua.LGFunction) {
-	for _, L := range t.plugins {
-		L.Lock()
-		defer L.Unlock()
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 
-		gt, ok := L.G.Global.RawGetString(globalLuaTableName).(*lua.LTable)
-		if !ok {
-			println("ERROR TRELAY NOT A TABLE: ", fname) //todo logging
-			return
-		}
+	call := func(L *luaplugin, fname string, ctxfn lua.LGFunction) {
+		defer wg.Done()
 
-		fn, ok := gt.RawGetString(fname).(*lua.LFunction)
-		if !ok {
-			return
-		}
+		mu.Lock()
+		defer mu.Unlock()
 
-		L.Push(fn)
-		if err := L.PCall(ctxfn(L.LState), lua.MultRet, nil); err != nil {
-			println("ERROR IN A FUNCTION: ", fname) //todo logging
-			return
-		}
+		L.Call(fname, ctxfn)
 	}
+
+	wg.Add(len(t.plugins))
+
+	for _, L := range t.plugins {
+		go call(L, fname, ctxfn)
+	}
+
+	wg.Wait()
 }
