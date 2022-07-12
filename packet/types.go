@@ -8,7 +8,7 @@ const (
 	SetUserSlot
 	PlayerInfo
 	PlayerInventorySlot
-	RequestWorldData
+	RequestWorldInfo
 	WorldInfo
 	GetSectionOrRequestSync
 	Status
