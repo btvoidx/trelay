@@ -23,7 +23,7 @@ const (
 	Time
 	DoorToggle
 	SendTileSquare
-	UpdateItemDrop
+	_
 	UpdateItemOwner
 	NPCUpdate
 	StrikeNPCwithHeldItem
@@ -92,7 +92,7 @@ const (
 	PlaceTileEntity
 	AlterItemDrop
 	PlaceItemFrame
-	UpdateItemDrop_Instanced
+	UpdateItemDrop
 	SyncEmoteBubble
 	SyncExtraValue
 	SocialHandshake
