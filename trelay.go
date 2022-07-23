@@ -4,25 +4,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"net"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/btvoidx/trelay/packet"
-	lua "github.com/yuin/gopher-lua"
 )
-
-const globalLuaTableName = "trelay"
 
 type trelay struct {
 	opts Options
 
 	listener net.Listener
-	plugins  []*luaplugin
+	plugins  []*lplugin
 	players  []TPlayer
-	servers  []TServer
 }
 
 type Options struct {
@@ -67,50 +65,62 @@ func (t *trelay) LoadPlugin(path string) error {
 		path = filepath.Join(path, "init.lua")
 	}
 
-	L := lua.NewState()
-	L.G.Global.RawSetString(globalLuaTableName, L.NewTable())
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 
-	if err := L.DoFile(path); err != nil {
+	lp := &lplugin{}
+
+	if err := lp.compile(f, path); err != nil {
 		return err
 	}
 
-	t.plugins = append(t.plugins, &luaplugin{
-		lstate: L,
-		mu:     sync.Mutex{},
-	})
+	if err := lp.load(t); err != nil {
+		return err
+	}
+
+	t.plugins = append(t.plugins, lp)
 	return nil
 }
 
-// Same as LoadPlugin, but loads from fs.FS
-// func (t *trelay) LoadPluginFS(fs fs.FS, path string) error {
-// 	f, err := fs.Open(path)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer f.Close()
+// Loads a lua plugin just as LoadPlugin, but from fs.FS
+func (t *trelay) LoadPluginFS(fs fs.FS, path string) error {
+	fileOrDir, err := fs.Open(path)
+	if os.IsNotExist(err) {
+		return err
+	}
+	defer fileOrDir.Close()
 
-// 	info, err := f.Stat()
-// 	if err != nil {
-// 		return err
-// 	}
+	info, err := fileOrDir.Stat()
+	if err != nil {
+		return err
+	}
 
-// 	if info.IsDir() {
-// 		path = filepath.Join(path, "init.lua")
-// 	}
+	if info.IsDir() {
+		path = filepath.Join(path, "init.lua")
+	}
 
-// 	source := make([]byte, 0, info.Size())
-// 	if n, err := f.Read(source); err != nil || n < int(info.Size()) {
-// 		return err
-// 	}
+	f, err := fs.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 
-// 	L := lua.NewState()
-// 	if err := L.DoString(string(source)); err != nil {
-// 		return err
-// 	}
+	lp := &lplugin{}
 
-// 	t.plugins = append(t.plugins, L)
-// 	return nil
-// }
+	if err := lp.compile(f, path); err != nil {
+		return err
+	}
+
+	if err := lp.load(t); err != nil {
+		return err
+	}
+
+	t.plugins = append(t.plugins, lp)
+	return nil
+}
 
 func (t *trelay) Start(addr string) error {
 	if t.opts.MaxPlayers < 0 {
@@ -162,21 +172,21 @@ func (t *trelay) getOpenPlayerSlot() int {
 	return -1
 }
 
-func (t *trelay) handshake(conn net.Conn) (*tplayer, bool) {
-	fmt.Printf("%s is connecting\n", conn.RemoteAddr())
+func (t *trelay) handshake(nc net.Conn) (*tplayer, bool) {
+	fmt.Printf("%s is connecting\n", nc.RemoteAddr())
 
 	var tpl *tplayer = &tplayer{
-		conn: conn,
+		rconn: nc,
 	}
 
 	disconnect := func() { tpl.Disconnect("Possible network tampering detected") }
 
 	for {
 		var err error
-		p, err := packet.ReadPacket(conn)
+		p, err := packet.ReadPacket(nc)
 		if err != nil {
-			fmt.Printf("%s failed handshake\n", conn.RemoteAddr())
-			conn.Close()
+			fmt.Printf("%s failed handshake\n", nc.RemoteAddr())
+			nc.Close()
 			return nil, false
 		}
 
@@ -184,17 +194,13 @@ func (t *trelay) handshake(conn net.Conn) (*tplayer, bool) {
 		// PlayerBuffs [50], PlayerInventorySlot [5] and finishes with RequestWorldData [6]
 		switch p.Type() {
 		case packet.ConnectRequest:
-			tpl.version, err = p.ReadString()
-			if err != nil {
-				disconnect()
-				continue
-			}
+			tpl.p_version = p
 
 			var pw packet.Writer
 			pw.SetType(packet.SetUserSlot)
 			pw.WriteByte(0) // This is player index, which client now will use to send data about itself
 
-			if _, err := conn.Write(pw.Packet().Data()); err != nil {
+			if _, err := nc.Write(pw.Packet().Data()); err != nil {
 				disconnect()
 				continue
 			}
@@ -205,24 +211,16 @@ func (t *trelay) handshake(conn net.Conn) (*tplayer, bool) {
 				continue
 			}
 
-			if _, err = p.ReadBytes(2); err != nil {
-				disconnect()
-				continue
-			}
-
-			if tpl.name, err = p.ReadString(); err != nil {
-				disconnect()
-				continue
-			}
+			tpl.p_info = p
 
 		case packet.ClientUUID:
-			if tpl.uuid, err = p.ReadString(); err != nil {
-				disconnect()
-				continue
-			}
+			tpl.p_uuid = p
 
-		case packet.RequestWorldData:
-			if tpl.uuid == "" || tpl.name == "" || tpl.version == "" {
+		case packet.PlayerHP, packet.PlayerMana, packet.PlayerInventorySlot:
+			tpl.p_other = append(tpl.p_other, p)
+
+		case packet.RequestWorldInfo:
+			if tpl.Uuid() == "" || tpl.Name() == "" || tpl.Version() == "" {
 				disconnect()
 				continue
 			}
@@ -241,100 +239,151 @@ func (t *trelay) handshake(conn net.Conn) (*tplayer, bool) {
 }
 
 func (t *trelay) connectionLoop(tpl *tplayer) {
-	fmt.Printf("%s (%s) has connected!\n", tpl.conn.RemoteAddr(), tpl.name)
-	t.callPlugins("on_connect", func(L *lua.LState) int {
-		t := L.NewTable()
-		t.RawSetString("player", tpl.toTable(L))
-		L.Push(t)
+	fmt.Printf("%s (%s) has connected!\n", tpl.rconn.RemoteAddr(), tpl.Name())
+	t.callPlugins("on_connect", func(lp *lplugin) int {
+		t := lp.LState.NewTable()
+		t.RawSetString("player", lp.LState.ToNumber(tpl.index))
+		lp.LState.Push(t)
 		return 1
 	})
 
-	defer fmt.Printf("%s (%s) has disconnected!\n", tpl.conn.RemoteAddr(), tpl.name)
-	defer t.callPlugins("on_disconnect", func(L *lua.LState) int {
-		t := L.NewTable()
-		t.RawSetString("player", tpl.toTable(L))
-		L.Push(t)
+	defer fmt.Printf("%s (%s) has disconnected!\n", tpl.rconn.RemoteAddr(), tpl.Name())
+	defer t.callPlugins("on_disconnect", func(lp *lplugin) int {
+		t := lp.LState.NewTable()
+		t.RawSetString("player", lp.LState.ToNumber(tpl.index))
+		lp.LState.Push(t)
 		return 1
 	})
 
-	func() {
+	// todo
+	if err := tpl.ChangeServer("localhost:7778"); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	go func() {
+		time.Sleep(time.Second * 5)
+		println("CONNECTING")
+		err := tpl.ChangeServer("localhost:7779")
+		if err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	var shouldClose bool
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		defer func() {
+			shouldClose = true
+			tpl.rconn.Close()
+		}()
+
 		for {
-			_, err := packet.ReadPacket(tpl.conn)
-			if err == io.EOF {
-				return
+			if shouldClose {
+				break
+			}
+
+			if tpl.sconn == nil {
+				continue
+			}
+
+			p, err := packet.ReadPacket(tpl.rconn)
+			if err == io.EOF && tpl.sconn == nil {
+				break
+			}
+
+			if err != nil {
+				continue
+			}
+
+			if p.Type() == packet.PlayerActive {
+				v, _ := p.ReadByte()
+				tpl.knownPlayers[v] = struct{}{}
+				println("New player is known!")
+			} else if p.Type() == packet.NPCUpdate {
+				v, _ := p.ReadInt16()
+				tpl.knownNPCs[v] = struct{}{}
+				println("New npc is known!")
+			} else if p.Type() == packet.UpdateItemDrop {
+				v, _ := p.ReadInt16()
+				tpl.knownItems[v] = struct{}{}
+				println("New item is known!")
 			}
 
 			if err != nil {
 				tpl.Disconnect("Network tampering detected")
-				return
+				break
 			}
 
-			var handled bool
+			// var handled bool
 
-			t.callPlugins("on_player_packet", func(L *lua.LState) int {
-				t := L.NewTable()
-				t.RawSetString("player", tpl.toTable(L))
-				t.RawSetString("handled", lua.LBool(handled))
-				t.RawSetString("set_handled", luafnSetPacketHandled(L, &handled))
-				L.Push(t)
-				return 1
-			})
+			// t.callPlugins("on_player_packet", func(lp *lplugin) int {
+			// 	t := lp.LState.NewTable()
+			// 	t.RawSetString("player", tpl.toTable(lp.LState)) // todo: pull from plugin's cache
+			// 	t.RawSetString("handled", luafnSetPacketHandled(lp.LState, &handled))
+			// 	lp.LState.Push(t)
+			// 	return 1
+			// })
 
-			if handled {
-				continue
-			}
-
-			// if session.Server.Write(p) != nil {
-			// 	break
+			// if handled {
+			// 	continue
 			// }
+
+			if _, err := tpl.sconn.Write(p.Data()); err != nil {
+				break
+			}
 		}
 	}()
 
-	// go func() {
-	// 	for {
-	// 		p, err := session.Server.Read()
-	// 		if err != nil {
-	// 			break
-	// 		}
+	go func() {
+		defer wg.Done()
+		defer func() {
+			shouldClose = true
+			if tpl.sconn != nil {
+				tpl.sconn.Close()
+			}
+		}()
 
-	// 		ctx := &PacketContext{
-	// 			packet:  p,
-	// 			session: session,
-	// 		}
+		for {
+			if shouldClose {
+				break
+			}
 
-	// 		for _, plugin := range s.plugins {
-	// 			plugin.OnServerPacket(ctx)
-	// 		}
+			if tpl.sconn == nil {
+				continue
+			}
 
-	// 		if ctx.handled {
-	// 			continue
-	// 		}
+			p, err := packet.ReadPacket(tpl.sconn)
+			if err == io.EOF && tpl.sconn != nil {
+				break
+			}
 
-	// 		if session.Client.Write(p) != nil {
-	// 			break
-	// 		}
-	// 	}
-	// }()
+			if err != nil {
+				continue
+			}
+
+			if _, err := tpl.rconn.Write(p.Data()); err != nil {
+				break
+			}
+		}
+	}()
+
+	wg.Wait()
 }
 
-// Calls all plguins sequentially, but call order is *not* guaranteed
-func (t *trelay) callPlugins(fname string, ctxfn lua.LGFunction) {
+// Calls all plguins asynchronously and waits for all of them
+func (t *trelay) callPlugins(fn string, ctx func(*lplugin) int) {
 	var wg sync.WaitGroup
-	var mu sync.Mutex
-
-	call := func(L *luaplugin, fname string, ctxfn lua.LGFunction) {
-		defer wg.Done()
-
-		mu.Lock()
-		defer mu.Unlock()
-
-		L.Call(fname, ctxfn)
-	}
-
-	wg.Add(len(t.plugins))
 
 	for _, L := range t.plugins {
-		go call(L, fname, ctxfn)
+		wg.Add(1)
+		go func(L *lplugin) {
+			L.Call(fn, ctx)
+			wg.Done()
+		}(L)
 	}
 
 	wg.Wait()
