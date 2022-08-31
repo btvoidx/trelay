@@ -10,6 +10,9 @@ Pluggable Terraria MITM-proxy for network routing and analysis.
 ## To-do's
 Feel free to use these as a starting point if you want to contribute
 - [x] Basic functionality
+- [ ] Standard session handlers
+  - [x] Direct
+  - [ ] Load balancing
 - [ ] Improve on README
   - [ ] Cool logo or something
   - [ ] Add more goals

@@ -9,6 +9,8 @@ func ListenAndServe(addr string, h SessionHandler) error {
 	return (&Server{Addr: addr, Handler: h}).ListenAndServe()
 }
 
+// A simplest SessionHandler. Connects the client to the remote server at specified address and makes sure
+// total player count is not exceeded.
 func Direct(addr string, maxPlayers int64) SessionHandler {
 	dcPacket := (&Writer{}).SetId(2).
 		WriteByte(0).
