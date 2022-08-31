@@ -3,144 +3,127 @@ package trelay
 import (
 	"errors"
 	"net"
+	"sync"
+	"sync/atomic"
 )
 
-type Options struct {
-	Addr                  string
-	RemoteAddr            string
-	DisableStandartLogger bool
-}
+// SessionHandler is a function that captures a session and returns two functions:
+// first handles packets sent by client, second handles packets sent by Terraria server.
+// Third function can be used to clean up any resources allocated that would otherwise be ignored by garbage collector.
+//
+// If one of the returned functions is nil, it is considered a no-op.
+type SessionHandler func(Session) (fromclient func(Packet), fromserver func(Packet), cleanup func())
 
 type Server struct {
-	l       net.Listener
-	plugins []Plugin
-	addr    string
-	raddr   string
+	// The address to listen on.
+	Addr string
+
+	// The function that gets called when a new session is created.
+	Handler SessionHandler
+
+	l net.Listener
 }
 
-func NewServer(c Options) *Server {
-	s := &Server{
-		addr:    c.Addr,
-		raddr:   c.RemoteAddr,
-		plugins: make([]Plugin, 0),
-	}
-
-	return s
-}
-
-// Starts server as a goroutine.
-func (s *Server) Start() (err error) {
-	s.l, err = net.Listen("tcp4", s.addr)
+// Starts the server
+func (s *Server) ListenAndServe() (err error) {
+	s.l, err = net.Listen("tcp4", s.Addr)
 	if err != nil {
 		return err
 	}
 
-	for _, plugin := range s.plugins {
-		plugin.OnServerStart()
-	}
-
-	go func() {
-		for {
-			nc, err := s.l.Accept()
-			if err != nil && errors.Is(err, net.ErrClosed) {
-				return
-			}
-
-			session := &Session{
-				Client: PacketConn{nc},
-			}
-
-			s.handleSession(session)
+	for {
+		nc, err := s.l.Accept()
+		if err != nil && errors.Is(err, net.ErrClosed) {
+			return nil
 		}
-	}()
 
-	return nil
+		session := &session{
+			client: nc,
+		}
+
+		go s.handleSession(session)
+	}
 }
 
 // Stops server's net.Listener and calls OnServerStop on all loaded plugins.
 func (s *Server) Stop() (err error) {
-	for _, plugin := range s.plugins {
-		plugin.OnServerStop()
-	}
+	// dcPacket := (&Writer{}).SetId(2).
+	// 	WriteByte(0).
+	// 	WriteString("Server is shutting down.").
+	// 	Data()
+
+	// for _, s := range s.sessions {
+	// 	if _, err := s.client.Write(dcPacket); err != nil {
+	// 		s.client.Close()
+	// 	}
+	// 	if s.remote != nil {
+	// 		s.remote.Close()
+	// 	}
+	// }
 
 	return s.l.Close()
 }
 
-func (s *Server) Addr() string       { return s.addr }
-func (s *Server) RemoteAddr() string { return s.raddr }
+func (s *Server) handleSession(session *session) {
+	fromclient, fromserver, cleanup := s.Handler(session)
 
-func (s *Server) LoadPlugin(loader func(*Server) Plugin) *Server {
-	s.plugins = append(s.plugins, loader(s))
-	return s
-}
-
-func (s *Server) handleSession(session *Session) {
-	for _, plugin := range s.plugins {
-		plugin.OnSessionOpen(session)
-	}
-
-	if session.Server.Conn == nil {
-		sc, err := net.Dial("tcp4", s.raddr)
-		if err != nil {
-			return
-		}
-		session.Server = PacketConn{sc}
-	}
+	var stopped atomic.Bool
+	var wg sync.WaitGroup
+	wg.Add(2)
 
 	go func() {
 		for {
-			p, err := session.Client.Read()
+			if stopped.Load() {
+				break
+			}
+
+			p, err := ReadPacket(session.client)
+			if err != nil {
+				break
+			}
+
+			if fromclient != nil {
+				fromclient(p)
+			}
+		}
+
+		session.client.Close() //nolint:errcheck
+		stopped.Store(true)
+		wg.Done()
+	}()
+
+	go func() {
+		for {
+			if stopped.Load() {
+				break
+			}
+
+			if session.remote == nil {
+				continue
+			}
+
+			p, err := ReadPacket(session.remote)
 			// if err == io.EOF {
 			if err != nil {
 				break
 			}
 
-			ctx := &PacketContext{
-				packet:  p,
-				session: session,
-			}
-
-			for _, plugin := range s.plugins {
-				plugin.OnClientPacket(ctx)
-			}
-
-			if ctx.handled {
-				continue
-			}
-
-			if session.Server.Write(p) != nil {
-				break
+			if fromserver != nil {
+				fromserver(p)
 			}
 		}
 
-		for _, plugin := range s.plugins {
-			plugin.OnSessionClose(session)
+		if session.remote != nil {
+			session.remote.Close() //nolint:errcheck
 		}
+
+		stopped.Store(true)
+		wg.Done()
 	}()
 
-	go func() {
-		for {
-			p, err := session.Server.Read()
-			if err != nil {
-				break
-			}
+	wg.Wait()
 
-			ctx := &PacketContext{
-				packet:  p,
-				session: session,
-			}
-
-			for _, plugin := range s.plugins {
-				plugin.OnServerPacket(ctx)
-			}
-
-			if ctx.handled {
-				continue
-			}
-
-			if session.Client.Write(p) != nil {
-				break
-			}
-		}
-	}()
+	if cleanup != nil {
+		cleanup()
+	}
 }
