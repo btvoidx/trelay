@@ -9,6 +9,10 @@ import (
 )
 
 func main() {
+	// !
+	// ! THIS EXAMPLE IS OUTDATED
+	// !
+
 	// Custom logger
 	log := log.New().WithField("Custom Field", true)
 

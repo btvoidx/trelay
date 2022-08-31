@@ -9,6 +9,10 @@ import (
 )
 
 func main() {
+	// !
+	// ! THIS EXAMPLE IS OUTDATED
+	// !
+
 	server := trelay.Server{
 		Addr:    ":7777",
 		Handler: trelay.Passthrough(":7878"),
