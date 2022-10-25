@@ -24,7 +24,11 @@ func Direct(addr string, maxPlayers int64) SessionHandler {
 
 	currentPlayers := atomic.Int64{}
 
-	return func(s Session) (fromclient func(Packet), fromserver func(Packet), cleanup func()) {
+	return func(s Session) (
+		onClientPacket func(Packet) (handled bool),
+		onServerPacket func(Packet) (handled bool),
+		onClose func(),
+	) {
 		if currentPlayers.Load() >= maxPlayers {
 			s.Client().Write(maxPlayersPacket) //nolint:errcheck
 			s.Client().Close()
@@ -32,21 +36,16 @@ func Direct(addr string, maxPlayers int64) SessionHandler {
 		}
 
 		currentPlayers.Add(1)
-		cleanup = func() { currentPlayers.Add(-1) }
+		onClose = func() { currentPlayers.Add(-1) }
 
-		if s.Remote() == nil {
-			serv, err := net.Dial("tcp", addr)
-			if err != nil {
-				s.Client().Write(dcPacket) //nolint:errcheck
-				s.Client().Close()
-				return
-			}
-
-			s.SetRemote(serv)
+		remote, err := net.Dial("tcp", addr)
+		if err != nil {
+			s.Client().Write(dcPacket) //nolint:errcheck
+			s.Client().Close()
+			return
 		}
 
-		fromclient = func(p Packet) { s.Remote().Write(p.Buffer()) } //nolint:errcheck
-		fromserver = func(p Packet) { s.Client().Write(p.Buffer()) } //nolint:errcheck
+		s.SetRemote(remote)
 
 		return
 	}

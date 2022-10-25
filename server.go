@@ -7,21 +7,22 @@ import (
 	"sync/atomic"
 )
 
-// SessionHandler is a function that captures a session and returns two functions:
-// first handles packets sent by client, second handles packets sent by Terraria server.
-// Third function can be used to clean up any resources allocated that would otherwise be ignored by garbage collector.
+// SessionHandler is a function that captures a session and returns three functions:
+// First handles packets sent by client, second handles packets sent by Terraria server.
+// Returning true from either will prevent proxy from forwarding the packet.
+// Third function can be used to clean up any resources allocated that would otherwise leak, e.g. global state.
 //
-// If one of the returned functions is nil, it is considered a no-op.
-type SessionHandler func(Session) (fromclient func(Packet), fromserver func(Packet), cleanup func())
+// If any function is nil, it will be considered no-op.
+type SessionHandler func(Session) (onClientPacket func(Packet) (handled bool), onServerPacket func(Packet) (handled bool), onClose func())
 
 type Server struct {
+	l net.Listener
+
 	// The address to listen on.
 	Addr string
 
-	// The function that gets called when a new session is created.
+	// Function that gets called when a new session is created.
 	Handler SessionHandler
-
-	l net.Listener
 }
 
 // Starts the server
@@ -65,7 +66,7 @@ func (s *Server) Stop() (err error) {
 }
 
 func (s *Server) handleSession(session *session) {
-	fromclient, fromserver, cleanup := s.Handler(session)
+	onClientPacket, onServerPacket, onClose := s.Handler(session)
 
 	var stopped atomic.Bool
 	var wg sync.WaitGroup
@@ -82,8 +83,8 @@ func (s *Server) handleSession(session *session) {
 				break
 			}
 
-			if fromclient != nil {
-				fromclient(p)
+			if onClientPacket == nil || onClientPacket(p) == false {
+				session.Remote().Write(p.Buffer())
 			}
 		}
 
@@ -108,8 +109,8 @@ func (s *Server) handleSession(session *session) {
 				break
 			}
 
-			if fromserver != nil {
-				fromserver(p)
+			if onServerPacket == nil || onServerPacket(p) == false {
+				session.Client().Write(p.Buffer())
 			}
 		}
 
@@ -123,7 +124,7 @@ func (s *Server) handleSession(session *session) {
 
 	wg.Wait()
 
-	if cleanup != nil {
-		cleanup()
+	if onClose != nil {
+		onClose()
 	}
 }
