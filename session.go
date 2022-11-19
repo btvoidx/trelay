@@ -6,7 +6,8 @@ import (
 
 type Session interface {
 	Client() io.WriteCloser
-	// Remote can be nil if the client is not yet connected to a server.
+	// Remote is a default target for unhandled packets.
+	// Can be nil if client is not yet connected to any server.
 	Remote() io.Writer
 	SetRemote(io.ReadWriteCloser)
 }

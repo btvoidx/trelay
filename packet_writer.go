@@ -7,7 +7,7 @@ import (
 )
 
 // Writer is used to efficiently build a terraria tcp packet.
-// Do not copy a non-zero Writer, it will jumble the packet.
+// Do not copy a non-zero Writer, as buffer will be shared.
 type Writer struct {
 	buf []byte
 }

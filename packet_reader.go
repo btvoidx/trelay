@@ -2,7 +2,6 @@ package trelay
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"math"
 )
@@ -21,10 +20,6 @@ func NewReader(buf []byte) *Reader {
 type Reader struct {
 	ptr uint16
 	buf []byte
-}
-
-func (r *Reader) String() string {
-	return fmt.Sprintf("Packet{id:%d, len:%d, data:%#v}", r.buf[2], binary.LittleEndian.Uint16(r.buf[0:2]), r.buf)
 }
 
 func (r *Reader) canReadN(l uint16) bool {
@@ -218,24 +213,22 @@ func (r *Reader) ReadString() (string, error) {
 func (r *Reader) MustReadString() string { return must(r.ReadString()) }
 
 func ReadPacket(r io.Reader) (Packet, error) {
+	ptr := uint16(3)
+
+	// Read packet head (length and id)
 	head := make([]byte, 3)
-	if n, err := r.Read(head); err != nil {
-		return nil, err
-	} else if n < 3 {
-		// todo:
-		// Technically, it is possible to read only part of the head if client's internet
-		// is very slow. Shouldn't be an error though, but I (@btvoidx) am too lazy to
-		// properly implement this part in the loop below, so this can be safely marked as todo
-		return nil, io.EOF
+	for ptr < 3 {
+		br, err := r.Read(head[ptr:3])
+		if err != nil {
+			return nil, err
+		}
+		ptr += uint16(br)
 	}
 
 	ln := binary.LittleEndian.Uint16(head[0:2])
 
+	// Read packet data
 	p := make(basicPacket, ln)
-	copy(p, head)
-
-	// Read data, if any
-	ptr := uint16(3)
 	for ptr < ln {
 		br, err := r.Read(p[ptr:ln])
 		if err != nil {
@@ -243,6 +236,8 @@ func ReadPacket(r io.Reader) (Packet, error) {
 		}
 		ptr += uint16(br)
 	}
+
+	copy(p, head)
 
 	return p, nil
 }

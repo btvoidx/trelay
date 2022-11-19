@@ -84,7 +84,7 @@ func (s *Server) handleSession(session *session) {
 			}
 
 			if onClientPacket == nil || onClientPacket(p) == false {
-				session.Remote().Write(p.Buffer())
+				session.Remote().Write(p.Data())
 			}
 		}
 
@@ -110,7 +110,7 @@ func (s *Server) handleSession(session *session) {
 			}
 
 			if onServerPacket == nil || onServerPacket(p) == false {
-				session.Client().Write(p.Buffer())
+				session.Client().Write(p.Data())
 			}
 		}
 
