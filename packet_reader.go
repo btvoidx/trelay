@@ -213,7 +213,7 @@ func (r *Reader) ReadString() (string, error) {
 func (r *Reader) MustReadString() string { return must(r.ReadString()) }
 
 func ReadPacket(r io.Reader) (Packet, error) {
-	ptr := uint16(3)
+	ptr := uint16(0)
 
 	// Read packet head (length and id)
 	head := make([]byte, 3)
