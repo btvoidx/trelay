@@ -83,7 +83,7 @@ func (s *Server) handleSession(session *session) {
 				break
 			}
 
-			if onClientPacket == nil || onClientPacket(p) == false {
+			if (onClientPacket == nil || onClientPacket(p) == false) && session.remote != nil {
 				session.Remote().Write(p.Data())
 			}
 		}
