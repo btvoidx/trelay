@@ -36,5 +36,5 @@ func (p basicPacket) Data() []byte {
 }
 
 func (p basicPacket) String() string {
-	return fmt.Sprintf("Packet{id:%d, len:%d, data:%#v}", p[2], binary.LittleEndian.Uint16(p[0:2]), p)
+	return fmt.Sprintf("Packet{id:%d, len:%d, data:%v}", p[2], binary.LittleEndian.Uint16(p[0:2]), []byte(p))
 }
