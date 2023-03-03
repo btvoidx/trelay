@@ -8,10 +8,8 @@ import (
 type Packet interface {
 	// Returns the packet Id.
 	Id() byte
-
 	// Returns the packet length.
 	Length() uint16
-
 	// Returns a copy of the packet buffer as sent by Terraria (includes packet length and Id).
 	Data() []byte
 }

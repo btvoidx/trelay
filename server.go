@@ -7,13 +7,18 @@ import (
 	"sync/atomic"
 )
 
-// SessionHandler is a function that captures a session and returns three functions:
-// First handles packets sent by client, second handles packets sent by Terraria server.
-// Returning true from either will prevent proxy from forwarding the packet.
-// Third function can be used to clean up any resources allocated that would otherwise leak, e.g. global state.
-//
-// If any function is nil, it will be considered no-op.
-type SessionHandler func(Session) (onClientPacket func(Packet) (handled bool), onServerPacket func(Packet) (handled bool), onClose func())
+type Handler interface {
+	// Called when a new client sends their first packet.
+	ClientConnect(Session)
+	// Called when a client disconnects.
+	ClientDisconnect(Session)
+	// Called when client sends a packet.
+	// Returning `true` will prevent the packet from being sent to server.
+	ClientPacket(Session, Packet) (block bool)
+	// Called when remote server sends a packet.
+	// Returning `true` will prevent the packet from being sent to client.
+	RemotePacket(Session, Packet) (block bool)
+}
 
 type Server struct {
 	l net.Listener
@@ -21,8 +26,9 @@ type Server struct {
 	// The address to listen on.
 	Addr string
 
-	// Function that gets called when a new session is created.
-	Handler SessionHandler
+	// Replacing the handler will not affect
+	// established connections.
+	Handler Handler
 }
 
 // Starts the server
@@ -38,15 +44,12 @@ func (s *Server) ListenAndServe() (err error) {
 			return nil
 		}
 
-		session := &session{
+		go s.handleSession(&session{
 			client: nc,
-		}
-
-		go s.handleSession(session)
+		})
 	}
 }
 
-// Stops server's net.Listener and calls OnServerStop on all loaded plugins.
 func (s *Server) Stop() (err error) {
 	// dcPacket := (&Writer{}).SetId(2).
 	// 	WriteByte(0).
@@ -66,39 +69,40 @@ func (s *Server) Stop() (err error) {
 }
 
 func (s *Server) handleSession(session *session) {
-	onClientPacket, onServerPacket, onClose := s.Handler(session)
+	onConnectCalled := false
+	onConnect := s.Handler.ClientConnect
+	onDisconnect := s.Handler.ClientDisconnect
+	onClientPacket := s.Handler.ClientPacket
+	onServerPacket := s.Handler.RemotePacket
 
-	var stopped atomic.Bool
-	var wg sync.WaitGroup
+	stopped := atomic.Bool{}
+	wg := sync.WaitGroup{}
 	wg.Add(2)
 
 	go func() {
-		for {
-			if stopped.Load() {
-				break
-			}
-
+		for !stopped.Load() {
 			p, err := ReadPacket(session.client)
 			if err != nil {
 				break
 			}
 
-			if (onClientPacket == nil || onClientPacket(p) == false) && session.remote != nil {
+			if !onConnectCalled {
+				onConnect(session)
+				onConnectCalled = true
+			}
+
+			if !onClientPacket(session, p) && session.remote != nil {
 				session.Remote().Write(p.Data())
 			}
 		}
 
-		session.client.Close() //nolint:errcheck
+		session.client.Close()
 		stopped.Store(true)
 		wg.Done()
 	}()
 
 	go func() {
-		for {
-			if stopped.Load() {
-				break
-			}
-
+		for !stopped.Load() {
 			if session.remote == nil {
 				continue
 			}
@@ -109,13 +113,13 @@ func (s *Server) handleSession(session *session) {
 				break
 			}
 
-			if onServerPacket == nil || onServerPacket(p) == false {
+			if !onServerPacket(session, p) {
 				session.Client().Write(p.Data())
 			}
 		}
 
 		if session.remote != nil {
-			session.remote.Close() //nolint:errcheck
+			session.remote.Close()
 		}
 
 		stopped.Store(true)
@@ -124,7 +128,5 @@ func (s *Server) handleSession(session *session) {
 
 	wg.Wait()
 
-	if onClose != nil {
-		onClose()
-	}
+	onDisconnect(session)
 }

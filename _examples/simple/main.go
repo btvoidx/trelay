@@ -7,7 +7,8 @@ import (
 )
 
 func main() {
-	if err := trelay.ListenAndServe(":7777", trelay.Direct("213.108.4.58:7777", 1)); err != nil {
+	err := trelay.ListenAndServe(":7777", &trelay.Direct{Addr: "213.108.4.58:7777", MaxPlayers: 1})
+	if err != nil {
 		log.Fatalf("An error occured when starting the server: %v", err)
 	}
 }

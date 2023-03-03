@@ -6,6 +6,7 @@ Pluggable Terraria MITM-proxy for network routing and analysis.
 
 ### Project goals:
 - Simple to use
+- No external dependecies
 
 ## To-do's
 Feel free to use these as a starting point if you want to contribute
