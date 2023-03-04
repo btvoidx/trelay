@@ -20,6 +20,11 @@ type Handler interface {
 	RemotePacket(Session, Packet) (block bool)
 }
 
+// Creates a default server and starts it.
+func ListenAndServe(addr string, h Handler) error {
+	return (&Server{Addr: addr, Handler: h}).ListenAndServe()
+}
+
 type Server struct {
 	l net.Listener
 
@@ -51,20 +56,6 @@ func (s *Server) ListenAndServe() (err error) {
 }
 
 func (s *Server) Stop() (err error) {
-	// dcPacket := (&Writer{}).SetId(2).
-	// 	WriteByte(0).
-	// 	WriteString("Server is shutting down.").
-	// 	Data()
-
-	// for _, s := range s.sessions {
-	// 	if _, err := s.client.Write(dcPacket); err != nil {
-	// 		s.client.Close()
-	// 	}
-	// 	if s.remote != nil {
-	// 		s.remote.Close()
-	// 	}
-	// }
-
 	return s.l.Close()
 }
 
@@ -92,7 +83,7 @@ func (s *Server) handleSession(session *session) {
 			}
 
 			if !onClientPacket(session, p) && session.remote != nil {
-				session.Remote().Write(p.Data())
+				session.Remote().WritePacket(p)
 			}
 		}
 
@@ -114,7 +105,7 @@ func (s *Server) handleSession(session *session) {
 			}
 
 			if !onServerPacket(session, p) {
-				session.Client().Write(p.Data())
+				session.Client().WritePacket(p)
 			}
 		}
 

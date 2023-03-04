@@ -2,37 +2,62 @@ package trelay
 
 import (
 	"encoding/binary"
-	"fmt"
+	"io"
 )
 
 type Packet interface {
-	// Returns the packet Id.
+	// Returns the packet id.
 	Id() byte
-	// Returns the packet length.
+	// Returns the packet total length.
 	Length() uint16
 	// Returns a copy of the packet buffer as sent by Terraria (includes packet length and Id).
 	Data() []byte
 }
 
-// Basic packet implementation. Eventually will be replaced by pre-parsed packets.
-type basicPacket []byte
+// Basic packet implementation
+type rawpacket struct{ b []byte }
 
-var _ Packet = (*basicPacket)(nil)
+func (p *rawpacket) Id() byte { return p.b[2] }
 
-func (p basicPacket) Id() byte {
-	return p[2]
-}
+func (p *rawpacket) Length() uint16 { return binary.LittleEndian.Uint16(p.b[0:2]) }
 
-func (p basicPacket) Length() uint16 {
-	return binary.LittleEndian.Uint16(p[0:2])
-}
-
-func (p basicPacket) Data() []byte {
-	buf := make([]byte, len(p))
-	copy(buf, p)
+func (p *rawpacket) Data() []byte {
+	buf := make([]byte, len(p.b))
+	copy(buf, p.b)
 	return buf
 }
 
-func (p basicPacket) String() string {
-	return fmt.Sprintf("Packet{id:%d, len:%d, data:%v}", p[2], binary.LittleEndian.Uint16(p[0:2]), []byte(p)[3:])
+// Reads one packet from r. Underlying Packet is *rawpacket.
+func ReadPacket(r io.Reader) (Packet, error) {
+	ptr := uint16(0)
+
+	// Read packet head (length and id)
+	head := make([]byte, 3)
+	for ptr < 3 {
+		br, err := r.Read(head[ptr:3])
+		if err != nil {
+			return nil, err
+		}
+		ptr += uint16(br)
+	}
+
+	ln := binary.LittleEndian.Uint16(head[0:2])
+
+	// Read packet data
+	b := make([]byte, ln)
+	for ptr < ln {
+		br, err := r.Read(b[ptr:ln])
+		if err != nil {
+			return nil, err
+		}
+		ptr += uint16(br)
+	}
+	copy(b, head)
+
+	return &rawpacket{b}, nil
 }
+
+// TODO
+// Parses rawpacket into correct underlying packet struct.
+// Returns p if p is not *rawpacket.
+// func ParsePacket(p Packet) (Packet, error)

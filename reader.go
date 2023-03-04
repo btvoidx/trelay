@@ -211,33 +211,3 @@ func (r *Reader) ReadString() (string, error) {
 
 // Reads and returns a string, panics if unsuccessful
 func (r *Reader) MustReadString() string { return must(r.ReadString()) }
-
-func ReadPacket(r io.Reader) (Packet, error) {
-	ptr := uint16(0)
-
-	// Read packet head (length and id)
-	head := make([]byte, 3)
-	for ptr < 3 {
-		br, err := r.Read(head[ptr:3])
-		if err != nil {
-			return nil, err
-		}
-		ptr += uint16(br)
-	}
-
-	ln := binary.LittleEndian.Uint16(head[0:2])
-
-	// Read packet data
-	p := make(basicPacket, ln)
-	for ptr < ln {
-		br, err := r.Read(p[ptr:ln])
-		if err != nil {
-			return nil, err
-		}
-		ptr += uint16(br)
-	}
-
-	copy(p, head)
-
-	return p, nil
-}

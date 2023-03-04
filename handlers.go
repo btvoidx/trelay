@@ -6,11 +6,6 @@ import (
 	"sync"
 )
 
-// Creates a default server and starts it.
-func ListenAndServe(addr string, h Handler) error {
-	return (&Server{Addr: addr, Handler: h}).ListenAndServe()
-}
-
 var _ Handler = (*Direct)(nil)
 
 // The simplest Handler. Connects the client to remote server at specified address and makes sure
@@ -42,11 +37,11 @@ func (h *Direct) ClientConnect(s Session) {
 			msg = "trelay: server is full"
 		}
 
-		s.Client().Write((&Writer{}).SetId(2).
+		s.Client().WritePacket(new(Builder).
+			SetId(2).
 			WriteByte(0).
-			WriteString(msg).
-			Data())
-		s.Client().Close()
+			WriteString(msg))
+		s.Close()
 		return
 	}
 
@@ -60,11 +55,11 @@ func (h *Direct) ClientConnect(s Session) {
 			msg = fmt.Sprintf("trelay: failed to connect to remote server at %s", h.Addr)
 		}
 
-		s.Client().Write((&Writer{}).SetId(2).
+		s.Client().WritePacket(new(Builder).
+			SetId(2).
 			WriteByte(0).
-			WriteString(msg).
-			Data())
-		s.Client().Close()
+			WriteString(msg))
+		s.Close()
 		return
 	}
 
