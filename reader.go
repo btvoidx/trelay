@@ -81,7 +81,8 @@ func (r *Reader) ReadBool() (bool, error) {
 // Reads a byte and returns true if is is != 0, panics if unsuccessful
 func (r *Reader) MustReadBool() bool { return must(r.ReadBool()) }
 
-// Reads and returns l bytes, error is io.EOF if unsuccessful. Head is not advanced on error, so it is still possible to read a smaller value from packet
+// Reads and returns l bytes, error is io.EOF if unsuccessful.
+// Head is not advanced on error, so it is still possible to read a smaller value from packet
 func (r *Reader) ReadBytes(l uint16) ([]byte, error) {
 	if !r.canReadN(l) {
 		return nil, io.EOF
@@ -95,7 +96,8 @@ func (r *Reader) ReadBytes(l uint16) ([]byte, error) {
 // Reads and returns l bytes, panics if unsuccessful
 func (r *Reader) MustReadBytes(l uint16) []byte { return must(r.ReadBytes(l)) }
 
-// Reads and returns uint16, error is io.EOF if unsuccessful. Head is not advanced on error, so it is still possible to read a smaller value from packet
+// Reads and returns uint16, error is io.EOF if unsuccessful.
+// Head is not advanced on error, so it is still possible to read a smaller value from packet
 func (r *Reader) ReadUint16() (uint16, error) {
 	if !r.canReadN(2) {
 		return 0, io.EOF
@@ -108,7 +110,8 @@ func (r *Reader) ReadUint16() (uint16, error) {
 // Reads and returns uint16, panics if unsuccessful
 func (r *Reader) MustReadUint16() uint16 { return must(r.ReadUint16()) }
 
-// Reads and returns int16, error is io.EOF if unsuccessful. Head is not advanced on error, so it is still possible to read a smaller value from packet
+// Reads and returns int16, error is io.EOF if unsuccessful.
+// Head is not advanced on error, so it is still possible to read a smaller value from packet
 func (r *Reader) ReadInt16() (int16, error) {
 	v, err := r.ReadUint16()
 	return int16(v), err
@@ -117,7 +120,8 @@ func (r *Reader) ReadInt16() (int16, error) {
 // Reads and returns int16, panics if unsuccessful
 func (r *Reader) MustReadInt16() int16 { return must(r.ReadInt16()) }
 
-// Reads and returns uint32, error is io.EOF if unsuccessful. Head is not advanced on error, so it is still possible to read a smaller value from packet
+// Reads and returns uint32, error is io.EOF if unsuccessful.
+// Head is not advanced on error, so it is still possible to read a smaller value from packet
 func (r *Reader) ReadUint32() (uint32, error) {
 	if !r.canReadN(4) {
 		return 0, io.EOF
@@ -130,7 +134,8 @@ func (r *Reader) ReadUint32() (uint32, error) {
 // Reads and returns uint32, panics if unsuccessful
 func (r *Reader) MustReadUint32() uint32 { return must(r.ReadUint32()) }
 
-// Reads and returns int32, error is io.EOF if unsuccessful. Head is not advanced on error, so it is still possible to read a smaller value from packet
+// Reads and returns int32, error is io.EOF if unsuccessful.
+// Head is not advanced on error, so it is still possible to read a smaller value from packet
 func (r *Reader) ReadInt32() (int32, error) {
 	v, err := r.ReadUint32()
 	return int32(v), err
@@ -139,7 +144,8 @@ func (r *Reader) ReadInt32() (int32, error) {
 // Reads and returns int32, panics if unsuccessful
 func (r *Reader) MustReadInt32() int32 { return must(r.ReadInt32()) }
 
-// Reads and returns uint64, error is io.EOF if unsuccessful. Head is not advanced on error, so it is still possible to read a smaller value from packet
+// Reads and returns uint64, error is io.EOF if unsuccessful.
+// Head is not advanced on error, so it is still possible to read a smaller value from packet
 func (r *Reader) ReadUint64() (uint64, error) {
 	if !r.canReadN(8) {
 		return 0, io.EOF
@@ -152,7 +158,8 @@ func (r *Reader) ReadUint64() (uint64, error) {
 // Reads and returns uint64, panics if unsuccessful
 func (r *Reader) MustReadUint64() uint64 { return must(r.ReadUint64()) }
 
-// Reads and returns int64, error is io.EOF if unsuccessful. Head is not advanced on error, so it is still possible to read a smaller value from packet
+// Reads and returns int64, error is io.EOF if unsuccessful.
+// Head is not advanced on error, so it is still possible to read a smaller value from packet
 func (r *Reader) ReadInt64() (int64, error) {
 	v, err := r.ReadUint64()
 	return int64(v), err
@@ -161,7 +168,8 @@ func (r *Reader) ReadInt64() (int64, error) {
 // Reads and returns int64, panics if unsuccessful
 func (r *Reader) MustReadInt64() int64 { return must(r.ReadInt64()) }
 
-// Reads and returns float32, error is io.EOF if unsuccessful. Head is not advanced on error, so it is still possible to read a smaller value from packet
+// Reads and returns float32, error is io.EOF if unsuccessful.
+// Head is not advanced on error, so it is still possible to read a smaller value from packet
 func (r *Reader) ReadFloat32() (float32, error) {
 	v, err := r.ReadUint32()
 	return math.Float32frombits(v), err
@@ -170,7 +178,8 @@ func (r *Reader) ReadFloat32() (float32, error) {
 // Reads and returns a float32, panics if unsuccessful
 func (r *Reader) MustReadFloat32() float32 { return must(r.ReadFloat32()) }
 
-// Reads and returns float64, error is io.EOF if unsuccessful. Head is not advanced on error, so it is still possible to read a smaller value from packet
+// Reads and returns float64, error is io.EOF if unsuccessful.
+// Head is not advanced on error, so it is still possible to read a smaller value from packet
 func (r *Reader) ReadFloat64() (float64, error) {
 	v, err := r.ReadUint64()
 	return math.Float64frombits(v), err
@@ -179,7 +188,8 @@ func (r *Reader) ReadFloat64() (float64, error) {
 // Reads and returns a float64, panics if unsuccessful
 func (r *Reader) MustReadFloat64() float64 { return must(r.ReadFloat64()) }
 
-// Reads and returns a string, error is io.EOF if unsuccessful. Head is not advanced on error, so it is still possible to read a smaller value from packet
+// Reads and returns a string, error is io.EOF if unsuccessful.
+// Head is not advanced on error, so it is still possible to read a smaller value from packet
 func (r *Reader) ReadString() (string, error) {
 	// saves current head so it can be restored on error
 	prevptr := r.ptr
