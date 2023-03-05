@@ -61,3 +61,8 @@ func ReadPacket(r io.Reader) (Packet, error) {
 // Parses rawpacket into correct underlying packet struct.
 // Returns p if p is not *rawpacket.
 // func ParsePacket(p Packet) (Packet, error)
+
+// TODO
+// Adds a custom packet parser to ParsePacket
+// func AddPacketParser(packetId byte, func(*Reader, replace bool) (Packet, error)) error
+
