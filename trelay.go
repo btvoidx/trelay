@@ -19,6 +19,7 @@ var (
 	_ io.Reader     = (*Packet)(nil)
 	_ io.ReaderFrom = (*Packet)(nil)
 	// _ io.ReaderAt   = (*Packet)(nil) // TODO
+	_ io.WriterTo = (*Packet)(nil)
 )
 
 func (p *Packet) Id() byte { return p.id }
@@ -65,6 +66,11 @@ func (p *Packet) ReadFrom(r io.Reader) (n int64, err error) {
 	nn, err = Fscan(r, &p.buf)
 	n += int64(nn)
 	return n, err
+}
+
+func (p Packet) WriteTo(w io.Writer) (n int64, err error) {
+	nn, err := Fprint(w, p.len, p.id, p.buf)
+	return int64(nn), err
 }
 
 // func (p *Packet) ReadAt(b []byte, off int64) (n int, err error)
