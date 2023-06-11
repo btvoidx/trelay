@@ -8,25 +8,53 @@ import (
 	"math"
 )
 
+type nocopy struct{}
+
+func (*nocopy) Lock()   {}
+func (*nocopy) Unlock() {}
+
+// Writing to Packet helps avoid manual bookkeeping of
+// length and id as opposed to bytes.Buffer.
+// Do not copy a non-zero packet, as buffer will be shared.
 type Packet struct {
-	id  byte
-	len uint16
+	ID  byte
 	ptr uint16
-	buf []byte
+	buf []byte // does not include header
+
+	_ nocopy // makes linters warn about passing by value
 }
 
 var (
-	_ io.Reader     = (*Packet)(nil)
+	_ io.ReadWriter = (*Packet)(nil)
 	_ io.ReaderFrom = (*Packet)(nil)
+	_ io.WriterTo   = (*Packet)(nil)
 	// _ io.ReaderAt   = (*Packet)(nil) // TODO
-	_ io.WriterTo = (*Packet)(nil)
+	// _ io.WriterAt   = (*Packet)(nil) // TODO
 )
 
-func (p *Packet) Id() byte { return p.id }
+func (p *Packet) setupBuffer() {
+	if p.buf == nil {
+		p.buf = make([]byte, 0, 32)
+	}
+}
 
 // Len includes length of packet header (3 bytes)
-func (p *Packet) Len() uint16 { return p.len }
+func (p *Packet) Len() uint16 { return uint16(len(p.buf) + 3) }
 
+// Returns a copy of the internal buffer + header.
+func (p *Packet) Bytes() []byte {
+	if len(p.buf) == 0 {
+		return []byte{3, 0, p.ID}
+	}
+
+	buf := make([]byte, len(p.buf)+3)
+	buf[2] = p.ID
+	binary.LittleEndian.PutUint16(buf[0:2], uint16(len(buf)))
+	copy(buf[3:], p.buf)
+	return buf
+}
+
+// Implements io.Reader. Skips packet header.
 func (p *Packet) Read(b []byte) (n int, err error) {
 	if int(p.ptr) >= len(p.buf) {
 		return 0, io.EOF
@@ -36,88 +64,61 @@ func (p *Packet) Read(b []byte) (n int, err error) {
 	return
 }
 
-// Will read an entire packet from r and reset internal buffer pointer,
-// assuming first three bytes read from r form a valid packet header.
+// Clears internal buffer, but retains space.
+func (p *Packet) Reset() {
+	p.ptr = 0
+	if p.buf != nil {
+		p.buf = p.buf[:0]
+	}
+}
+
+// Resets internal read pointer to the start.
+func (p *Packet) RReset() { p.ptr = 0 }
+
+// Will read an entire packet from r and overwrite current data,
+// assuming first three bytes read form a valid packet header.
 //
 // As opposed to definition of io.ReaderFrom, reads only up to
 // length given in the header. Will reuse internal buffer when possible.
 func (p *Packet) ReadFrom(r io.Reader) (n int64, err error) {
 	p.ptr = 0
 
-	nn, err := Fscan(r, &p.len, &p.id)
+	var ln uint16
+	nn, err := Fscan(r, &ln, &p.ID)
 	n += int64(nn)
 	if err != nil {
 		return n, err
 	}
 
-	if p.len <= 3 {
+	if ln <= 3 {
 		// effectively empties the buffer so Reads fail
 		// but preserves it to allow for later reuse
 		p.buf = p.buf[:0]
 		return n, nil
 	}
 
-	if int(p.len-3) > cap(p.buf) {
-		p.buf = make([]byte, p.len-3)
+	if int(ln-3) > cap(p.buf) {
+		p.buf = make([]byte, ln-3)
 	}
 
-	p.buf = p.buf[0 : p.len-3] // reslice
+	p.buf = p.buf[0 : ln-3] // reslice
 
 	nn, err = Fscan(r, &p.buf)
 	n += int64(nn)
 	return n, err
 }
 
-func (p Packet) WriteTo(w io.Writer) (n int64, err error) {
-	nn, err := Fprint(w, p.len, p.id, p.buf)
-	return int64(nn), err
+// Imlements io.Writer. Writes data to the end of the packet.
+func (p *Packet) Write(b []byte) (n int, err error) {
+	p.setupBuffer()
+	p.buf = append(p.buf, b...)
+	return len(b), nil
 }
 
-// func (p *Packet) ReadAt(b []byte, off int64) (n int, err error)
-
-// Builder helps avoid manual bookkeeping of packet
-// length and id as opposed to bytes.Buffer.
-// Do not copy a non-zero Builder, as buffer will be shared.
-// Zero value is ready to use.
-type Builder struct {
-	ID  byte
-	buf []byte
-}
-
-var (
-	_ io.Writer   = (*Builder)(nil)
-	_ io.WriterTo = (*Builder)(nil)
-)
-
-func (b *Builder) setupBuffer() {
-	if b.buf == nil {
-		b.buf = make([]byte, 3, 32)
-	}
-}
-
-func (b *Builder) Write(d []byte) (n int, err error) {
-	b.setupBuffer()
-	b.buf = append(b.buf, d...)
-	return len(d), nil
-}
-
-// Reslices internal buffer to clear it for reuse.
-func (b *Builder) Reset() {
-	b.setupBuffer()
-	b.buf = b.buf[:3]
-}
-
-// Updates length and ID in the internal buffer and returns it.
-func (b *Builder) Bytes() []byte {
-	b.setupBuffer()
-	b.buf[2] = b.ID
-	binary.LittleEndian.PutUint16(b.buf[0:2], uint16(len(b.buf)))
-	return b.buf
-}
-
-func (b Builder) WriteTo(w io.Writer) (n int64, err error) {
-	d := b.Bytes()
-	nn, err := w.Write(d)
+// Implements io.WriterTo. Writes the entire packet, including header,
+// even when Read pointer is not at the start. Avoids unnecessary allocations.
+func (p *Packet) WriteTo(w io.Writer) (n int64, err error) {
+	nn, err := Fprint(w, uint16(len(p.buf)+3), p.ID, p.buf)
 	return int64(nn), err
 }
 

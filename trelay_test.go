@@ -43,11 +43,11 @@ func TestFscanSimple(t *testing.T) {
 }
 
 func TestFprintBuilder(t *testing.T) {
-	b := &trelay.Builder{ID: 1}
-	trelay.Fprint(b, "Terraria123")
+	p := &trelay.Packet{ID: 1}
+	trelay.Fprint(p, "Terraria123")
 
 	// 15 0 1 "Terraria123"
 	data := []byte{0xf, 0x0, 0x1, 0xb, 0x54, 0x65, 0x72, 0x72, 0x61, 0x72, 0x69, 0x61, 0x31, 0x32, 0x33}
 
-	compbytes(t, b.Bytes(), data)
+	compbytes(t, data, p.Bytes())
 }
