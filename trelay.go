@@ -279,6 +279,14 @@ func Fprint(w io.Writer, v ...any) (n int, err error) {
 			var buf [8]byte
 			binary.LittleEndian.PutUint64(buf[:], uint64(v))
 			a, err = w.Write(buf[:])
+		case float32:
+			var buf [4]byte
+			binary.LittleEndian.PutUint32(buf[:], math.Float32bits(v))
+			a, err = w.Write(buf[:])
+		case float64:
+			var buf [8]byte
+			binary.LittleEndian.PutUint64(buf[:], math.Float64bits(v))
+			a, err = w.Write(buf[:])
 		case string:
 			if ln := len(v); ln >= 128 {
 				buf := [2]byte{byte((ln % 128) + 128), byte(ln / 128)}
