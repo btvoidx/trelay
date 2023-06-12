@@ -7,17 +7,21 @@ jobs:
     name: Golang-CI Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: golangci/golangci-lint-action@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v3
+        with:
+          version: 'latest'
 
   test:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
         with:
-          go-version: 1.20
+          go-version-file: go.mod
 
-      - run: go mod download
       - run: go test -v ./...
